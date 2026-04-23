@@ -45,6 +45,12 @@ test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })
 
+  // Dismiss mic overlay (which covers the canvas) — watch-only button is hidden by default
+  // so dismiss it directly to avoid UI coupling
+  await page.evaluate(() => {
+    document.getElementById('mic-overlay')?.classList.add('hidden')
+  })
+
   // Intercept requestFullscreen before the key fires — headless Chromium
   // blocks the actual fullscreen API, so we verify the call was attempted.
   await page.evaluate(() => {
