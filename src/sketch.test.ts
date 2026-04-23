@@ -12,7 +12,7 @@ type FakeInstance = {
   windowHeight: number
   WEBGL: string
   createCanvas: ReturnType<typeof vi.fn>
-  background: ReturnType<typeof vi.fn>
+  noStroke: ReturnType<typeof vi.fn>
   resizeCanvas: ReturnType<typeof vi.fn>
   remove: ReturnType<typeof vi.fn>
   setup?: () => void
@@ -26,7 +26,7 @@ function makeInstance(): FakeInstance {
     windowHeight: 600,
     WEBGL: 'webgl',
     createCanvas: vi.fn(() => ({ style: vi.fn() })),
-    background: vi.fn(),
+    noStroke: vi.fn(),
     resizeCanvas: vi.fn(),
     remove: vi.fn(),
   }
