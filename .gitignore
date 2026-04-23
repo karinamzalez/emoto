@@ -5,3 +5,6 @@ dist/
 *.local
 playwright-report/
 test-results/
+.DS_Store
+.claude/
+.playwright-mcp/
