@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test'
 test('canvas with webgl context is mounted at /', async ({ page }) => {
   await page.goto('/')
 
-  const canvas = page.locator('canvas')
+  const canvas = page.locator('canvas.p5Canvas')
   await expect(canvas).toBeVisible()
 
   const hasWebGL = await page.evaluate(() => {
-    const el = document.querySelector('canvas')
+    const el = document.querySelector('canvas.p5Canvas')
     if (!el) return false
     return el.getContext('webgl') !== null || el.getContext('webgl2') !== null
   })
@@ -19,7 +19,7 @@ test('canvas fills viewport at 1280x720', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.goto('/')
 
-  const canvas = page.locator('canvas')
+  const canvas = page.locator('canvas.p5Canvas')
   await expect(canvas).toBeVisible()
 
   const box = await canvas.boundingBox()
@@ -32,7 +32,7 @@ test('canvas fills viewport at 1920x1080', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.goto('/')
 
-  const canvas = page.locator('canvas')
+  const canvas = page.locator('canvas.p5Canvas')
   await expect(canvas).toBeVisible()
 
   const box = await canvas.boundingBox()
@@ -44,17 +44,17 @@ test('canvas fills viewport at 1920x1080', async ({ page }) => {
 test('sanity wedge exhibits 6-fold rotational symmetry', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
 
   // Let p5 run a few draw frames so the framebuffer is populated.
   await page.waitForFunction(() => {
-    const c = document.querySelector('canvas') as HTMLCanvasElement | null
+    const c = document.querySelector('canvas.p5Canvas') as HTMLCanvasElement | null
     return !!c && c.width > 0 && c.height > 0
   })
   await page.waitForTimeout(250)
 
   const deltas = await page.evaluate(() => {
-    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const src = document.querySelector('canvas.p5Canvas') as HTMLCanvasElement
     const tmp = document.createElement('canvas')
     tmp.width = src.width
     tmp.height = src.height
@@ -113,7 +113,7 @@ async function canvasVariance(
   page: import('@playwright/test').Page
 ): Promise<{ mean: number; variance: number }> {
   return page.evaluate(() => {
-    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const src = document.querySelector('canvas.p5Canvas') as HTMLCanvasElement
     const tmp = document.createElement('canvas')
     tmp.width = src.width
     tmp.height = src.height
@@ -132,7 +132,7 @@ async function canvasVariance(
 test('hex lattice renders with non-trivial pixel variance at default scale', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
   const stats = await canvasVariance(page)
@@ -146,7 +146,7 @@ test('hex lattice renders with non-trivial pixel variance at default scale', asy
 test('branching field: pixel variance increases with u_growth', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
   // Baseline at growth=0 (pure lattice, no branches)
@@ -175,50 +175,18 @@ test('branching field: pixel variance increases with u_growth', async ({ page })
 test('fresnel rim: center alpha is significantly less than edge alpha', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
-  const { centerAlpha, edgeAlpha } = await page.evaluate(() => {
-    const src = document.querySelector('canvas') as HTMLCanvasElement
-    // Read directly from the WebGL framebuffer (preserveDrawingBuffer: true) so
-    // we see the actual alpha written by the shader, not the page-composited result.
-    const gl = (src.getContext('webgl') ?? src.getContext('webgl2')) as WebGLRenderingContext
-
-    // readPixels uses bottom-left origin; flip y from canvas CSS coordinates.
-    function readAlpha(cssX: number, cssY: number): number {
-      const px = new Uint8Array(4)
-      // p5 canvas logical px == CSS px (pixelDensity clamp handles DPR)
-      gl.readPixels(cssX, src.height - cssY - 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
-      return px[3]
-    }
-
-    const cx = Math.floor(src.width / 2)
-    const cy = Math.floor(src.height / 2)
-
-    // Average alpha over a small grid at center
-    let centerSum = 0
-    const half = 3
-    for (let dy = -half; dy <= half; dy++) {
-      for (let dx = -half; dx <= half; dx++) {
-        centerSum += readAlpha(cx + dx, cy + dy)
-      }
-    }
-    const centerAlpha = centerSum / (half * 2 + 1) ** 2
-
-    // Sample 8 points near the silhouette rim (at ~70% of half canvas dim)
-    const r = Math.floor(Math.min(src.width, src.height) * 0.35)
-    let rimSum = 0
-    for (let i = 0; i < 8; i++) {
-      const theta = (i / 8) * Math.PI * 2
-      rimSum += readAlpha(
-        Math.round(cx + r * Math.cos(theta)),
-        Math.round(cy + r * Math.sin(theta))
-      )
-    }
-    const edgeAlpha = rimSum / 8
-
-    return { centerAlpha, edgeAlpha }
-  })
+  // p5.js blits its internal FBO to the display canvas with alpha=255, so
+  // reading the canvas element directly always yields opaque pixels.
+  // Instead, sketch.ts writes __emotoLastAlpha after each draw call, sampling
+  // alpha from p5's active render target before the blit.
+  const { center: centerAlpha, edge: edgeAlpha } = await page.evaluate(
+    () =>
+      (window as Window & { __emotoLastAlpha?: { center: number; edge: number } })
+        .__emotoLastAlpha ?? { center: 0, edge: 0 }
+  )
 
   // Center should be nearly transparent (~10% of 255 ≈ 25); rim should be substantially brighter.
   expect(centerAlpha).toBeLessThan(edgeAlpha * 0.6)
@@ -227,7 +195,7 @@ test('fresnel rim: center alpha is significantly less than edge alpha', async ({
 test('thin-film iridescence: hue shifts across three u_irisThickness values', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
   async function rgbMeans(thickness: number): Promise<[number, number, number]> {
@@ -239,7 +207,7 @@ test('thin-film iridescence: hue shifts across three u_irisThickness values', as
     await page.waitForTimeout(150)
 
     return page.evaluate(() => {
-      const src = document.querySelector('canvas') as HTMLCanvasElement
+      const src = document.querySelector('canvas.p5Canvas') as HTMLCanvasElement
       const tmp = document.createElement('canvas')
       tmp.width = src.width
       tmp.height = src.height
@@ -293,7 +261,7 @@ test('chromatic dispersion: R/G/B channels diverge more at higher u_dispersionSt
 }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
   // Freeze animation so both snapshots are animation-stable.
@@ -310,7 +278,7 @@ test('chromatic dispersion: R/G/B channels diverge more at higher u_dispersionSt
     }, strength)
     await page.waitForTimeout(80)
     return page.evaluate(() => {
-      const src = document.querySelector('canvas') as HTMLCanvasElement
+      const src = document.querySelector('canvas.p5Canvas') as HTMLCanvasElement
       const tmp = document.createElement('canvas')
       tmp.width = src.width
       tmp.height = src.height
@@ -348,7 +316,7 @@ test('chromatic dispersion: R/G/B channels diverge more at higher u_dispersionSt
 test('crystal baseline: visual regression within 2% pixel diff', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
 
   // Freeze animation for a deterministic baseline render.
   await page.evaluate(() => {
@@ -358,7 +326,7 @@ test('crystal baseline: visual regression within 2% pixel diff', async ({ page }
   })
   await page.waitForTimeout(150)
 
-  await expect(page.locator('canvas')).toHaveScreenshot('crystal-baseline.png', {
+  await expect(page.locator('canvas.p5Canvas')).toHaveScreenshot('crystal-baseline.png', {
     maxDiffPixelRatio: 0.02,
   })
 
@@ -372,12 +340,12 @@ test('crystal baseline: visual regression within 2% pixel diff', async ({ page }
 
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
-  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.locator('canvas.p5Canvas').waitFor({ state: 'visible' })
 
   // Intercept requestFullscreen before the key fires — headless Chromium
   // blocks the actual fullscreen API, so we verify the call was attempted.
   await page.evaluate(() => {
-    const canvas = document.querySelector('canvas')
+    const canvas = document.querySelector('canvas.p5Canvas')
     if (canvas) {
       ;(window as unknown as Record<string, unknown>)['__fullscreenRequested'] = false
       canvas.requestFullscreen = async () => {
@@ -386,7 +354,6 @@ test('F key triggers fullscreen request on canvas', async ({ page }) => {
     }
   })
 
-  await page.locator('canvas').click()
   await page.keyboard.press('f')
 
   const requested = await page.evaluate(

@@ -136,6 +136,18 @@ export function createSketch(container?: HTMLElement): p5 {
       }
       _material.apply(s, uniforms as unknown as Record<string, number | number[] | boolean>)
       s.plane(s.width, s.height)
+
+      // Test hook: read alpha from p5's active framebuffer right after the shader
+      // draws. s.get() uses the correct format for p5's internal FBO (which may be
+      // RGBA16F in WebGL2), unlike a raw gl.readPixels UNSIGNED_BYTE call.
+      const cx = Math.floor(s.width / 2)
+      const cy = Math.floor(s.height / 2)
+      const r = Math.floor(Math.min(s.width, s.height) * 0.35)
+      const centerPx = s.get(cx, cy) as number[]
+      const edgePx = s.get(cx + r, cy) as number[]
+      ;(
+        window as Window & { __emotoLastAlpha?: { center: number; edge: number } }
+      ).__emotoLastAlpha = { center: centerPx[3], edge: edgePx[3] }
     }
 
     const handleResize = debounce(() => {
