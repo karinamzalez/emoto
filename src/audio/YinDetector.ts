@@ -20,6 +20,14 @@ export class YinDetector {
    * Returns pitchHz in 80–800 Hz, or null when unvoiced/noisy.
    */
   detect(samples: Float32Array): number | null {
+    return this.detectWithClarity(samples).pitchHz
+  }
+
+  /**
+   * Run YIN and also return clarity (1 - CMNDF minimum), a 0..1 voicing confidence.
+   * clarity = 0 when unvoiced/noisy; clarity ≈ 1 for a pure periodic tone.
+   */
+  detectWithClarity(samples: Float32Array): { pitchHz: number | null; clarity: number } {
     const { frameSize, tauMin, tauMax, threshold, sampleRate } = this
 
     // CMNDF stored in-place: d[0]=1, d[tau] = tau*raw[tau] / runningSum
@@ -48,11 +56,13 @@ export class YinDetector {
       tau++
     }
 
-    if (tau > tauMax) return null
+    if (tau > tauMax) return { pitchHz: null, clarity: 0 }
 
     const refined = this.parabolicInterp(d, tau)
     const pitch = sampleRate / refined
-    return pitch >= 80 && pitch <= 800 ? pitch : null
+    const clarity = Math.max(0, 1 - d[tau])
+    const pitchHz = pitch >= 80 && pitch <= 800 ? pitch : null
+    return { pitchHz, clarity: pitchHz !== null ? clarity : 0 }
   }
 
   private parabolicInterp(d: Float32Array, tau: number): number {
