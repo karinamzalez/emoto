@@ -19,7 +19,7 @@ export class ShaderMaterial {
     this._shader = null
   }
 
-  apply(s: p5, uniforms: Record<string, number | number[]> = {}): void {
+  apply(s: p5, uniforms: Record<string, number | number[] | boolean> = {}): void {
     const sh = this.getShader(s)
     s.shader(sh)
     for (const [key, value] of Object.entries(uniforms)) {
