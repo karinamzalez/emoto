@@ -2,11 +2,13 @@ precision highp float;
 
 #include "hex_symmetry.glsl"
 #include "hex_lattice.glsl"
+#include "branch.glsl"
 
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float u_latticeScale;
 uniform float u_latticeDepth;
+uniform float u_growth;
 
 varying vec2 vTexCoord;
 
@@ -22,7 +24,12 @@ void main() {
   // Hex lattice: apothem = half the scale constant so cells tile tightly.
   float apothem = u_latticeScale * 0.5;
   vec2 cell = hexTile(wuv, u_latticeScale);
-  float d = hexSDF(cell, apothem);
+
+  // Base lattice SDF and dendritic branch field composed via smooth-min
+  // so branch arms blend into the lattice walls rather than cutting.
+  float d_lattice = hexSDF(cell, apothem);
+  float d_branch = branchField(cell, apothem, u_growth);
+  float d = smin(d_lattice, d_branch, apothem * 0.12);
 
   // Sharp edge mask — positive SDF is the boundary zone.
   float edgeWidth = apothem * 0.08;

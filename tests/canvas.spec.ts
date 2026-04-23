@@ -109,35 +109,67 @@ test('sanity wedge exhibits 6-fold rotational symmetry', async ({ page }) => {
   expect(avg).toBeGreaterThan(0) // guards against blank readback
 })
 
+async function canvasVariance(
+  page: import('@playwright/test').Page
+): Promise<{ mean: number; variance: number }> {
+  return page.evaluate(() => {
+    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const tmp = document.createElement('canvas')
+    tmp.width = src.width
+    tmp.height = src.height
+    tmp.getContext('2d')!.drawImage(src, 0, 0)
+    const data = tmp.getContext('2d')!.getImageData(0, 0, tmp.width, tmp.height).data
+    const vals: number[] = []
+    for (let i = 0; i < data.length; i += 32) vals.push(data[i])
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    return {
+      mean,
+      variance: vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length,
+    }
+  })
+}
+
 test('hex lattice renders with non-trivial pixel variance at default scale', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })
   await page.waitForTimeout(300)
 
-  const stats = await page.evaluate(() => {
-    const src = document.querySelector('canvas') as HTMLCanvasElement
-    const tmp = document.createElement('canvas')
-    tmp.width = src.width
-    tmp.height = src.height
-    const ctx = tmp.getContext('2d')!
-    ctx.drawImage(src, 0, 0)
-
-    const data = ctx.getImageData(0, 0, tmp.width, tmp.height).data
-    const vals: number[] = []
-    // Sample luminance every 8 pixels (R channel only for speed)
-    for (let i = 0; i < data.length; i += 32) {
-      vals.push(data[i])
-    }
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
-    const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length
-    return { mean, variance }
-  })
+  const stats = await canvasVariance(page)
 
   // Lattice produces distinct cell interiors and dark edges — variance
   // should be well above a solid or near-uniform fill.
   expect(stats.mean).toBeGreaterThan(5) // not blank / all-black
   expect(stats.variance).toBeGreaterThan(200) // not solid color
+})
+
+test('branching field: pixel variance increases with u_growth', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.waitForTimeout(300)
+
+  // Baseline at growth=0 (pure lattice, no branches)
+  await page.evaluate(() =>
+    (window as Window & { __emotoSetGrowth?: (v: number) => void }).__emotoSetGrowth?.(0)
+  )
+  await page.waitForTimeout(150)
+  const statsAt0 = await canvasVariance(page)
+
+  // Full branches at growth=1 should change pixel content noticeably
+  await page.evaluate(() =>
+    (window as Window & { __emotoSetGrowth?: (v: number) => void }).__emotoSetGrowth?.(1)
+  )
+  await page.waitForTimeout(150)
+  const statsAt1 = await canvasVariance(page)
+
+  // Both states must produce non-trivial content (not blank)
+  expect(statsAt0.mean).toBeGreaterThan(5)
+  expect(statsAt1.mean).toBeGreaterThan(5)
+  // The two states must differ — branches change the pixel distribution
+  const meanDiff = Math.abs(statsAt1.mean - statsAt0.mean)
+  const varDiff = Math.abs(statsAt1.variance - statsAt0.variance)
+  expect(meanDiff + varDiff).toBeGreaterThan(5)
 })
 
 test('F key triggers fullscreen request on canvas', async ({ page }) => {

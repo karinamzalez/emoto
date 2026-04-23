@@ -9,8 +9,15 @@ let _frag = latticeFrag
 let _material: ShaderMaterial | null = null
 let _latticeScale = 0.15
 const _latticeDepth = 0.8
+let _growth = 0.5
 
 export const stageSize = { w: 0, h: 0 }
+
+// Test hook: allows Playwright to set growth without full app reload.
+;(window as Window & { __emotoSetGrowth?: (v: number) => void }).__emotoSetGrowth = (v: number) => {
+  _growth = Math.min(Math.max(v, 0), 1)
+  _material = null
+}
 
 export function clampPixelDensity(ratio: number): number {
   return Math.min(ratio, 2)
@@ -87,6 +94,7 @@ export function createSketch(container?: HTMLElement): p5 {
         uResolution: [s.width, s.height],
         u_latticeScale: _latticeScale,
         u_latticeDepth: _latticeDepth,
+        u_growth: _growth,
       })
       s.plane(s.width, s.height)
     }
