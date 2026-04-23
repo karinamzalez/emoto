@@ -1,5 +1,7 @@
 import { createSketch } from './sketch'
 import { Mic } from './audio/Mic'
+import { AudioFeaturesSource } from './audio/AudioFeaturesSource'
+import { DebugOverlay } from './audio/DebugOverlay'
 
 const overlay = document.getElementById('mic-overlay') as HTMLDivElement
 const btnBegin = document.getElementById('btn-begin') as HTMLButtonElement
@@ -12,6 +14,9 @@ const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 if (!prefersReduced) {
   btnWatch.style.display = 'none'
 }
+
+const isDebugMode = import.meta.env.DEV || new URLSearchParams(location.search).has('debug')
+const debugOverlay = isDebugMode ? new DebugOverlay() : null
 
 const mic = new Mic()
 
@@ -28,6 +33,19 @@ mic.onChange((state) => {
   } else if (state === 'listening' || state === 'watch-only') {
     overlay.classList.add('hidden')
   }
+})
+
+mic.onReady(({ analyser, sampleRate }) => {
+  const source = new AudioFeaturesSource(analyser, sampleRate)
+  let lastT = performance.now()
+  function tick() {
+    const now = performance.now()
+    const features = source.read(now - lastT)
+    lastT = now
+    debugOverlay?.update(features)
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
 })
 
 btnBegin.addEventListener('click', () => {
