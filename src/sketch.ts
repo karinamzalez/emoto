@@ -7,6 +7,7 @@ import sanityFrag from './gfx/shaders/sanity.frag'
 let _vert = sanityVert
 let _frag = sanityFrag
 let _material: ShaderMaterial | null = null
+let _showWedgeEdges = false
 
 export const stageSize = { w: 0, h: 0 }
 
@@ -63,6 +64,10 @@ export function createSketch(container?: HTMLElement): p5 {
     let canvasEl: HTMLElement | null = null
 
     s.setup = () => {
+      // Enable preserveDrawingBuffer so the canvas is readable via
+      // drawImage / toDataURL — needed for Playwright pixel symmetry
+      // verification. Negligible perf cost for a single full-screen canvas.
+      s.setAttributes('preserveDrawingBuffer', true)
       const canvas = s.createCanvas(s.windowWidth, s.windowHeight, s.WEBGL)
       canvas.style('display', 'block')
       canvasEl = canvas.elt as HTMLElement
@@ -79,6 +84,7 @@ export function createSketch(container?: HTMLElement): p5 {
       _material.apply(s, {
         uTime: s.millis() / 1000,
         uResolution: [s.width, s.height],
+        u_showWedgeEdges: _showWedgeEdges,
       })
       s.plane(s.width, s.height)
     }
@@ -94,6 +100,9 @@ export function createSketch(container?: HTMLElement): p5 {
     s.keyPressed = () => {
       if ((s.key === 'f' || s.key === 'F') && canvasEl) {
         toggleFullscreen(canvasEl)
+      }
+      if (s.key === 'E') {
+        _showWedgeEdges = !_showWedgeEdges
       }
     }
   }, container)

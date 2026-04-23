@@ -41,6 +41,74 @@ test('canvas fills viewport at 1920x1080', async ({ page }) => {
   expect(Math.abs(box!.height - 1080)).toBeLessThanOrEqual(1)
 })
 
+test('sanity wedge exhibits 6-fold rotational symmetry', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+
+  // Let p5 run a few draw frames so the framebuffer is populated.
+  await page.waitForFunction(() => {
+    const c = document.querySelector('canvas') as HTMLCanvasElement | null
+    return !!c && c.width > 0 && c.height > 0
+  })
+  await page.waitForTimeout(250)
+
+  const deltas = await page.evaluate(() => {
+    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const tmp = document.createElement('canvas')
+    tmp.width = src.width
+    tmp.height = src.height
+    const ctx = tmp.getContext('2d')!
+    ctx.drawImage(src, 0, 0)
+
+    const cx = Math.floor(src.width / 2)
+    const cy = Math.floor(src.height / 2)
+    const r = Math.floor(Math.min(src.width, src.height) * 0.18)
+
+    // Average a 5x5 box to absorb subpixel rounding from the rotation
+    // sampling — the GLSL fold is exact, but fcos(θ) and fcos(θ+π/3)
+    // land on different subpixels.
+    function avg(px: number, py: number): [number, number, number] {
+      const d = ctx.getImageData(px - 2, py - 2, 5, 5).data
+      let R = 0,
+        G = 0,
+        B = 0
+      const n = 25
+      for (let i = 0; i < n; i++) {
+        R += d[i * 4]
+        G += d[i * 4 + 1]
+        B += d[i * 4 + 2]
+      }
+      return [R / n, G / n, B / n]
+    }
+
+    const results: number[] = []
+    for (let i = 0; i < 24; i++) {
+      const theta = (i / 24) * Math.PI * 2
+      const x0 = Math.round(cx + r * Math.cos(theta))
+      const y0 = Math.round(cy - r * Math.sin(theta))
+      const x1 = Math.round(cx + r * Math.cos(theta + Math.PI / 3))
+      const y1 = Math.round(cy - r * Math.sin(theta + Math.PI / 3))
+
+      const a = avg(x0, y0)
+      const b = avg(x1, y1)
+      const d = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])
+      results.push(d)
+    }
+    return results
+  })
+
+  // Each pair (θ, θ + 60°) should agree within a small tolerance.
+  // Tolerance (~5% of max sum-of-RGB range 765) absorbs pixel
+  // quantization when sampling along a ring — the GLSL fold itself
+  // is exact. A random pattern would average ≥120 per pair.
+  const maxDelta = Math.max(...deltas)
+  expect(maxDelta).toBeLessThan(60)
+  const avg = deltas.reduce((acc, v) => acc + v, 0) / deltas.length
+  expect(avg).toBeLessThan(35)
+  expect(avg).toBeGreaterThan(0) // guards against blank readback
+})
+
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })
