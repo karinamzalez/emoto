@@ -100,6 +100,12 @@ export function createSketch(container?: HTMLElement): p5 {
       if (!_material) {
         _material = new ShaderMaterial(_vert, _frag)
       }
+      // Disable blending so gl_FragColor.a is written directly to the framebuffer.
+      // The canvas element composites with the page background using those alpha
+      // values, producing the glass-clear center; readPixels also sees the real alpha.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gl = (s as any)._renderer.GL as WebGLRenderingContext
+      gl.disable(gl.BLEND)
       _material.apply(s, {
         uTime: s.millis() / 1000,
         uResolution: [s.width, s.height],

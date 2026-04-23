@@ -180,42 +180,47 @@ test('fresnel rim: center alpha is significantly less than edge alpha', async ({
 
   const { centerAlpha, edgeAlpha } = await page.evaluate(() => {
     const src = document.querySelector('canvas') as HTMLCanvasElement
-    const tmp = document.createElement('canvas')
-    tmp.width = src.width
-    tmp.height = src.height
-    const ctx = tmp.getContext('2d')!
-    ctx.drawImage(src, 0, 0)
+    // Read directly from the WebGL framebuffer (preserveDrawingBuffer: true) so
+    // we see the actual alpha written by the shader, not the page-composited result.
+    const gl = (src.getContext('webgl') ?? src.getContext('webgl2')) as WebGLRenderingContext
+
+    // readPixels uses bottom-left origin; flip y from canvas CSS coordinates.
+    function readAlpha(cssX: number, cssY: number): number {
+      const px = new Uint8Array(4)
+      // p5 canvas logical px == CSS px (pixelDensity clamp handles DPR)
+      gl.readPixels(cssX, src.height - cssY - 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+      return px[3]
+    }
 
     const cx = Math.floor(src.width / 2)
     const cy = Math.floor(src.height / 2)
 
-    // Average alpha over a 9x9 box to reduce subpixel noise
-    function avgAlpha(px: number, py: number, half = 4): number {
-      const size = half * 2 + 1
-      const d = ctx.getImageData(px - half, py - half, size, size).data
-      let sum = 0
-      for (let i = 0; i < size * size; i++) sum += d[i * 4 + 3]
-      return sum / (size * size)
+    // Average alpha over a small grid at center
+    let centerSum = 0
+    const half = 3
+    for (let dy = -half; dy <= half; dy++) {
+      for (let dx = -half; dx <= half; dx++) {
+        centerSum += readAlpha(cx + dx, cy + dy)
+      }
     }
+    const centerAlpha = centerSum / (half * 2 + 1) ** 2
 
-    // Center of crystal
-    const centerAlpha = avgAlpha(cx, cy)
-
-    // Sample 8 points near the silhouette rim (at ~70% of half-min-dim)
+    // Sample 8 points near the silhouette rim (at ~70% of half canvas dim)
     const r = Math.floor(Math.min(src.width, src.height) * 0.35)
     let rimSum = 0
     for (let i = 0; i < 8; i++) {
       const theta = (i / 8) * Math.PI * 2
-      const rx = Math.round(cx + r * Math.cos(theta))
-      const ry = Math.round(cy + r * Math.sin(theta))
-      rimSum += avgAlpha(rx, ry)
+      rimSum += readAlpha(
+        Math.round(cx + r * Math.cos(theta)),
+        Math.round(cy + r * Math.sin(theta))
+      )
     }
     const edgeAlpha = rimSum / 8
 
     return { centerAlpha, edgeAlpha }
   })
 
-  // Center should be nearly transparent (~10% of max 255), rim should be substantially brighter.
+  // Center should be nearly transparent (~10% of 255 ≈ 25); rim should be substantially brighter.
   expect(centerAlpha).toBeLessThan(edgeAlpha * 0.6)
 })
 
