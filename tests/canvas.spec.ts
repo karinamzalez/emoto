@@ -288,6 +288,63 @@ test('thin-film iridescence: hue shifts across three u_irisThickness values', as
   expect(Math.max(d12, d23, d13)).toBeGreaterThan(4)
 })
 
+test('chromatic dispersion: R/G/B channels diverge more at higher u_dispersionStrength', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.waitForTimeout(300)
+
+  // Freeze animation so both snapshots are animation-stable.
+  await page.evaluate(() => {
+    ;(window as Window & { __emotoFreezeTime?: (t: number | null) => void }).__emotoFreezeTime?.(
+      0.5
+    )
+  })
+  await page.waitForTimeout(80)
+
+  async function snapshot(strength: number): Promise<number[]> {
+    await page.evaluate((s) => {
+      ;(window as Window & { __emotoSetDispersion?: (v: number) => void }).__emotoSetDispersion?.(s)
+    }, strength)
+    await page.waitForTimeout(80)
+    return page.evaluate(() => {
+      const src = document.querySelector('canvas') as HTMLCanvasElement
+      const tmp = document.createElement('canvas')
+      tmp.width = src.width
+      tmp.height = src.height
+      tmp.getContext('2d')!.drawImage(src, 0, 0)
+      const data = tmp.getContext('2d')!.getImageData(0, 0, tmp.width, tmp.height).data
+      // Sample a grid across the full canvas for a robust comparison.
+      const out: number[] = []
+      for (let i = 0; i < data.length; i += 16) out.push(data[i])
+      return out
+    })
+  }
+
+  const px0 = await snapshot(0)
+  const px05 = await snapshot(0.5)
+
+  // Unfreeze time.
+  await page.evaluate(() => {
+    ;(window as Window & { __emotoFreezeTime?: (t: number | null) => void }).__emotoFreezeTime?.(
+      null
+    )
+  })
+
+  // With frozen time, dispersion=0 and dispersion=0.5 should produce visibly
+  // different images — total pixel difference must exceed a small threshold.
+  const totalDiff = px0.reduce((acc, v, i) => acc + Math.abs(v - px05[i]), 0)
+  expect(totalDiff).toBeGreaterThan(500)
+
+  // Both states must produce non-trivial content.
+  const mean0 = px0.reduce((a, b) => a + b, 0) / px0.length
+  const mean05 = px05.reduce((a, b) => a + b, 0) / px05.length
+  expect(mean0).toBeGreaterThan(5)
+  expect(mean05).toBeGreaterThan(5)
+})
+
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })

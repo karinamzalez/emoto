@@ -13,6 +13,7 @@ let _growth = 0.5
 const _fresnelPower = 3.0
 let _irisThickness = 0.3
 const _irisIntensity = 0.6
+let _dispersionStrength = 0.5
 
 export const stageSize = { w: 0, h: 0 }
 
@@ -27,6 +28,21 @@ export const stageSize = { w: 0, h: 0 }
   v: number
 ) => {
   _irisThickness = Math.min(Math.max(v, 0), 1)
+}
+
+// Test hook: allows Playwright to set dispersion strength without full app reload.
+;(window as Window & { __emotoSetDispersion?: (v: number) => void }).__emotoSetDispersion = (
+  v: number
+) => {
+  _dispersionStrength = Math.min(Math.max(v, 0), 1)
+}
+
+// Test hook: freeze uTime at a fixed value so snapshot comparisons are animation-stable.
+let _frozenTime: number | null = null
+;(window as Window & { __emotoFreezeTime?: (t: number | null) => void }).__emotoFreezeTime = (
+  t: number | null
+) => {
+  _frozenTime = t
 }
 
 export function clampPixelDensity(ratio: number): number {
@@ -107,7 +123,7 @@ export function createSketch(container?: HTMLElement): p5 {
       const gl = (s as any)._renderer.GL as WebGLRenderingContext
       gl.disable(gl.BLEND)
       _material.apply(s, {
-        uTime: s.millis() / 1000,
+        uTime: _frozenTime !== null ? _frozenTime : s.millis() / 1000,
         uResolution: [s.width, s.height],
         u_latticeScale: _latticeScale,
         u_latticeDepth: _latticeDepth,
@@ -115,6 +131,7 @@ export function createSketch(container?: HTMLElement): p5 {
         u_fresnelPower: _fresnelPower,
         u_irisThickness: _irisThickness,
         u_irisIntensity: _irisIntensity,
+        u_dispersionStrength: _dispersionStrength,
       })
       s.plane(s.width, s.height)
     }
@@ -137,6 +154,9 @@ export function createSketch(container?: HTMLElement): p5 {
       // Adjust iris thickness: i/o keys sweep through thin-film spectrum
       if (s.key === 'o') _irisThickness = Math.min(_irisThickness + 0.05, 1.0)
       if (s.key === 'i') _irisThickness = Math.max(_irisThickness - 0.05, 0.0)
+      // Adjust chromatic dispersion strength: < / > keys
+      if (s.key === '.') _dispersionStrength = Math.min(_dispersionStrength + 0.05, 1.0)
+      if (s.key === ',') _dispersionStrength = Math.max(_dispersionStrength - 0.05, 0.0)
     }
   }, container)
 }
