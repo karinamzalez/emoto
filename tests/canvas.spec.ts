@@ -345,6 +345,31 @@ test('chromatic dispersion: R/G/B channels diverge more at higher u_dispersionSt
   expect(mean05).toBeGreaterThan(5)
 })
 
+test('crystal baseline: visual regression within 2% pixel diff', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+
+  // Freeze animation for a deterministic baseline render.
+  await page.evaluate(() => {
+    ;(window as Window & { __emotoFreezeTime?: (t: number | null) => void }).__emotoFreezeTime?.(
+      1.0
+    )
+  })
+  await page.waitForTimeout(150)
+
+  await expect(page.locator('canvas')).toHaveScreenshot('crystal-baseline.png', {
+    maxDiffPixelRatio: 0.02,
+  })
+
+  // Unfreeze so other tests run normally.
+  await page.evaluate(() => {
+    ;(window as Window & { __emotoFreezeTime?: (t: number | null) => void }).__emotoFreezeTime?.(
+      null
+    )
+  })
+})
+
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })

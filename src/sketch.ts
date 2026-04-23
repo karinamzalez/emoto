@@ -1,11 +1,12 @@
 import p5 from 'p5'
 import { ShaderMaterial } from './gfx/ShaderMaterial'
+import { type CrystalUniforms } from './gfx/CrystalUniforms'
 import sanityVert from './gfx/shaders/sanity.vert'
-import latticeFrag from './gfx/shaders/lattice.frag'
+import crystalFrag from './gfx/shaders/crystal.frag'
 
 // Module-level refs so HMR handlers can swap shader sources without re-mounting
 let _vert = sanityVert
-let _frag = latticeFrag
+let _frag = crystalFrag
 let _material: ShaderMaterial | null = null
 let _latticeScale = 0.15
 const _latticeDepth = 0.8
@@ -87,7 +88,7 @@ if (import.meta.hot) {
     _material = null
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  import.meta.hot.accept('./gfx/shaders/lattice.frag', (mod: any) => {
+  import.meta.hot.accept('./gfx/shaders/crystal.frag', (mod: any) => {
     _frag = mod?.default as string
     _material = null
   })
@@ -122,7 +123,7 @@ export function createSketch(container?: HTMLElement): p5 {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const gl = (s as any)._renderer.GL as WebGLRenderingContext
       gl.disable(gl.BLEND)
-      _material.apply(s, {
+      const uniforms: CrystalUniforms = {
         uTime: _frozenTime !== null ? _frozenTime : s.millis() / 1000,
         uResolution: [s.width, s.height],
         u_latticeScale: _latticeScale,
@@ -132,7 +133,8 @@ export function createSketch(container?: HTMLElement): p5 {
         u_irisThickness: _irisThickness,
         u_irisIntensity: _irisIntensity,
         u_dispersionStrength: _dispersionStrength,
-      })
+      }
+      _material.apply(s, uniforms as unknown as Record<string, number | number[] | boolean>)
       s.plane(s.width, s.height)
     }
 
