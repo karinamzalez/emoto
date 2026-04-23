@@ -1,13 +1,14 @@
 import p5 from 'p5'
 import { ShaderMaterial } from './gfx/ShaderMaterial'
 import sanityVert from './gfx/shaders/sanity.vert'
-import sanityFrag from './gfx/shaders/sanity.frag'
+import latticeFrag from './gfx/shaders/lattice.frag'
 
 // Module-level refs so HMR handlers can swap shader sources without re-mounting
 let _vert = sanityVert
-let _frag = sanityFrag
+let _frag = latticeFrag
 let _material: ShaderMaterial | null = null
-let _showWedgeEdges = false
+let _latticeScale = 0.15
+const _latticeDepth = 0.8
 
 export const stageSize = { w: 0, h: 0 }
 
@@ -53,7 +54,7 @@ if (import.meta.hot) {
     _material = null
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  import.meta.hot.accept('./gfx/shaders/sanity.frag', (mod: any) => {
+  import.meta.hot.accept('./gfx/shaders/lattice.frag', (mod: any) => {
     _frag = mod?.default as string
     _material = null
   })
@@ -84,7 +85,8 @@ export function createSketch(container?: HTMLElement): p5 {
       _material.apply(s, {
         uTime: s.millis() / 1000,
         uResolution: [s.width, s.height],
-        u_showWedgeEdges: _showWedgeEdges,
+        u_latticeScale: _latticeScale,
+        u_latticeDepth: _latticeDepth,
       })
       s.plane(s.width, s.height)
     }
@@ -101,9 +103,9 @@ export function createSketch(container?: HTMLElement): p5 {
       if ((s.key === 'f' || s.key === 'F') && canvasEl) {
         toggleFullscreen(canvasEl)
       }
-      if (s.key === 'E') {
-        _showWedgeEdges = !_showWedgeEdges
-      }
+      // Adjust lattice scale for live QA
+      if (s.key === ']') _latticeScale = Math.min(_latticeScale * 1.25, 1.0)
+      if (s.key === '[') _latticeScale = Math.max(_latticeScale * 0.8, 0.02)
     }
   }, container)
 }

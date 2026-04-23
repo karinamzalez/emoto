@@ -109,6 +109,37 @@ test('sanity wedge exhibits 6-fold rotational symmetry', async ({ page }) => {
   expect(avg).toBeGreaterThan(0) // guards against blank readback
 })
 
+test('hex lattice renders with non-trivial pixel variance at default scale', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.waitForTimeout(300)
+
+  const stats = await page.evaluate(() => {
+    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const tmp = document.createElement('canvas')
+    tmp.width = src.width
+    tmp.height = src.height
+    const ctx = tmp.getContext('2d')!
+    ctx.drawImage(src, 0, 0)
+
+    const data = ctx.getImageData(0, 0, tmp.width, tmp.height).data
+    const vals: number[] = []
+    // Sample luminance every 8 pixels (R channel only for speed)
+    for (let i = 0; i < data.length; i += 32) {
+      vals.push(data[i])
+    }
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length
+    return { mean, variance }
+  })
+
+  // Lattice produces distinct cell interiors and dark edges — variance
+  // should be well above a solid or near-uniform fill.
+  expect(stats.mean).toBeGreaterThan(5) // not blank / all-black
+  expect(stats.variance).toBeGreaterThan(200) // not solid color
+})
+
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })
