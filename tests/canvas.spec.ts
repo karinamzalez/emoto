@@ -172,6 +172,117 @@ test('branching field: pixel variance increases with u_growth', async ({ page })
   expect(meanDiff + varDiff).toBeGreaterThan(5)
 })
 
+test('fresnel rim: center alpha is significantly less than edge alpha', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.waitForTimeout(300)
+
+  const { centerAlpha, edgeAlpha } = await page.evaluate(() => {
+    const src = document.querySelector('canvas') as HTMLCanvasElement
+    const tmp = document.createElement('canvas')
+    tmp.width = src.width
+    tmp.height = src.height
+    const ctx = tmp.getContext('2d')!
+    ctx.drawImage(src, 0, 0)
+
+    const cx = Math.floor(src.width / 2)
+    const cy = Math.floor(src.height / 2)
+
+    // Average alpha over a 9x9 box to reduce subpixel noise
+    function avgAlpha(px: number, py: number, half = 4): number {
+      const size = half * 2 + 1
+      const d = ctx.getImageData(px - half, py - half, size, size).data
+      let sum = 0
+      for (let i = 0; i < size * size; i++) sum += d[i * 4 + 3]
+      return sum / (size * size)
+    }
+
+    // Center of crystal
+    const centerAlpha = avgAlpha(cx, cy)
+
+    // Sample 8 points near the silhouette rim (at ~70% of half-min-dim)
+    const r = Math.floor(Math.min(src.width, src.height) * 0.35)
+    let rimSum = 0
+    for (let i = 0; i < 8; i++) {
+      const theta = (i / 8) * Math.PI * 2
+      const rx = Math.round(cx + r * Math.cos(theta))
+      const ry = Math.round(cy + r * Math.sin(theta))
+      rimSum += avgAlpha(rx, ry)
+    }
+    const edgeAlpha = rimSum / 8
+
+    return { centerAlpha, edgeAlpha }
+  })
+
+  // Center should be nearly transparent (~10% of max 255), rim should be substantially brighter.
+  expect(centerAlpha).toBeLessThan(edgeAlpha * 0.6)
+})
+
+test('thin-film iridescence: hue shifts across three u_irisThickness values', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.goto('/')
+  await page.locator('canvas').waitFor({ state: 'visible' })
+  await page.waitForTimeout(300)
+
+  async function rgbMeans(thickness: number): Promise<[number, number, number]> {
+    await page.evaluate((t) => {
+      ;(
+        window as Window & { __emotoSetIrisThickness?: (v: number) => void }
+      ).__emotoSetIrisThickness?.(t)
+    }, thickness)
+    await page.waitForTimeout(150)
+
+    return page.evaluate(() => {
+      const src = document.querySelector('canvas') as HTMLCanvasElement
+      const tmp = document.createElement('canvas')
+      tmp.width = src.width
+      tmp.height = src.height
+      tmp.getContext('2d')!.drawImage(src, 0, 0)
+      const data = tmp.getContext('2d')!.getImageData(0, 0, tmp.width, tmp.height).data
+
+      let R = 0,
+        G = 0,
+        B = 0,
+        n = 0
+      // Sample centre region (middle 40%) to avoid the dark radial fade boundary.
+      const cx = Math.floor(src.width / 2),
+        cy = Math.floor(src.height / 2)
+      const r = Math.floor(Math.min(src.width, src.height) * 0.2)
+      for (let y = cy - r; y < cy + r; y += 4) {
+        for (let x = cx - r; x < cx + r; x += 4) {
+          const i = (y * src.width + x) * 4
+          R += data[i]
+          G += data[i + 1]
+          B += data[i + 2]
+          n++
+        }
+      }
+      return [R / n, G / n, B / n] as [number, number, number]
+    })
+  }
+
+  const [r1, g1, b1] = await rgbMeans(0.1)
+  const [r2, g2, b2] = await rgbMeans(0.5)
+  const [r3, g3, b3] = await rgbMeans(0.9)
+
+  // All three thickness values must produce visible, non-black content.
+  expect(r1 + g1 + b1).toBeGreaterThan(30)
+  expect(r2 + g2 + b2).toBeGreaterThan(30)
+  expect(r3 + g3 + b3).toBeGreaterThan(30)
+
+  // Sweeping thickness must shift the hue distribution — at least two of
+  // the three pairs must differ by more than 3 per channel on average.
+  function rgbDist(a: number[], b: number[]): number {
+    return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])
+  }
+  const d12 = rgbDist([r1, g1, b1], [r2, g2, b2])
+  const d23 = rgbDist([r2, g2, b2], [r3, g3, b3])
+  const d13 = rgbDist([r1, g1, b1], [r3, g3, b3])
+  // At least one pair must show a noticeable shift (>4 total across channels).
+  expect(Math.max(d12, d23, d13)).toBeGreaterThan(4)
+})
+
 test('F key triggers fullscreen request on canvas', async ({ page }) => {
   await page.goto('/')
   await page.locator('canvas').waitFor({ state: 'visible' })

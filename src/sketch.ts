@@ -10,6 +10,9 @@ let _material: ShaderMaterial | null = null
 let _latticeScale = 0.15
 const _latticeDepth = 0.8
 let _growth = 0.5
+const _fresnelPower = 3.0
+let _irisThickness = 0.3
+const _irisIntensity = 0.6
 
 export const stageSize = { w: 0, h: 0 }
 
@@ -17,6 +20,13 @@ export const stageSize = { w: 0, h: 0 }
 ;(window as Window & { __emotoSetGrowth?: (v: number) => void }).__emotoSetGrowth = (v: number) => {
   _growth = Math.min(Math.max(v, 0), 1)
   _material = null
+}
+
+// Test hook: allows Playwright to set iris thickness without full app reload.
+;(window as Window & { __emotoSetIrisThickness?: (v: number) => void }).__emotoSetIrisThickness = (
+  v: number
+) => {
+  _irisThickness = Math.min(Math.max(v, 0), 1)
 }
 
 export function clampPixelDensity(ratio: number): number {
@@ -76,6 +86,7 @@ export function createSketch(container?: HTMLElement): p5 {
       // drawImage / toDataURL — needed for Playwright pixel symmetry
       // verification. Negligible perf cost for a single full-screen canvas.
       s.setAttributes('preserveDrawingBuffer', true)
+      s.setAttributes('alpha', true)
       const canvas = s.createCanvas(s.windowWidth, s.windowHeight, s.WEBGL)
       canvas.style('display', 'block')
       canvasEl = canvas.elt as HTMLElement
@@ -95,6 +106,9 @@ export function createSketch(container?: HTMLElement): p5 {
         u_latticeScale: _latticeScale,
         u_latticeDepth: _latticeDepth,
         u_growth: _growth,
+        u_fresnelPower: _fresnelPower,
+        u_irisThickness: _irisThickness,
+        u_irisIntensity: _irisIntensity,
       })
       s.plane(s.width, s.height)
     }
@@ -114,6 +128,9 @@ export function createSketch(container?: HTMLElement): p5 {
       // Adjust lattice scale for live QA
       if (s.key === ']') _latticeScale = Math.min(_latticeScale * 1.25, 1.0)
       if (s.key === '[') _latticeScale = Math.max(_latticeScale * 0.8, 0.02)
+      // Adjust iris thickness: i/o keys sweep through thin-film spectrum
+      if (s.key === 'o') _irisThickness = Math.min(_irisThickness + 0.05, 1.0)
+      if (s.key === 'i') _irisThickness = Math.max(_irisThickness - 0.05, 0.0)
     }
   }, container)
 }
