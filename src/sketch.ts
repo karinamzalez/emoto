@@ -8,6 +8,43 @@ let _vert = sanityVert
 let _frag = sanityFrag
 let _material: ShaderMaterial | null = null
 
+export const stageSize = { w: 0, h: 0 }
+
+export function clampPixelDensity(ratio: number): number {
+  return Math.min(ratio, 2)
+}
+
+function debounce(fn: () => void, ms: number): () => void {
+  let timer: ReturnType<typeof setTimeout>
+  return () => {
+    clearTimeout(timer)
+    timer = setTimeout(fn, ms)
+  }
+}
+
+function requestFullscreen(el: HTMLElement): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = el as any
+  ;(e.requestFullscreen ?? e.webkitRequestFullscreen ?? e.mozRequestFullScreen)?.call(e)
+}
+
+function exitFullscreen(): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = document as any
+  ;(d.exitFullscreen ?? d.webkitExitFullscreen ?? d.mozCancelFullScreen)?.call(d)
+}
+
+function toggleFullscreen(el: HTMLElement): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = document as any
+  const isFullscreen = !!(document.fullscreenElement ?? d.webkitFullscreenElement)
+  if (isFullscreen) {
+    exitFullscreen()
+  } else {
+    requestFullscreen(el)
+  }
+}
+
 if (import.meta.hot) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   import.meta.hot.accept('./gfx/shaders/sanity.vert', (mod: any) => {
@@ -23,9 +60,15 @@ if (import.meta.hot) {
 
 export function createSketch(container?: HTMLElement): p5 {
   return new p5((s: p5) => {
+    let canvasEl: HTMLElement | null = null
+
     s.setup = () => {
       const canvas = s.createCanvas(s.windowWidth, s.windowHeight, s.WEBGL)
       canvas.style('display', 'block')
+      canvasEl = canvas.elt as HTMLElement
+      s.pixelDensity(clampPixelDensity(window.devicePixelRatio ?? 1))
+      stageSize.w = s.windowWidth
+      stageSize.h = s.windowHeight
       s.noStroke()
     }
 
@@ -40,8 +83,18 @@ export function createSketch(container?: HTMLElement): p5 {
       s.plane(s.width, s.height)
     }
 
-    s.windowResized = () => {
+    const handleResize = debounce(() => {
       s.resizeCanvas(s.windowWidth, s.windowHeight)
+      stageSize.w = s.windowWidth
+      stageSize.h = s.windowHeight
+    }, 100)
+
+    s.windowResized = handleResize
+
+    s.keyPressed = () => {
+      if ((s.key === 'f' || s.key === 'F') && canvasEl) {
+        toggleFullscreen(canvasEl)
+      }
     }
   }, container)
 }
