@@ -17,6 +17,7 @@ type FakeInstance = {
   noStroke: ReturnType<typeof vi.fn>
   resizeCanvas: ReturnType<typeof vi.fn>
   pixelDensity: ReturnType<typeof vi.fn>
+  setAttributes: ReturnType<typeof vi.fn>
   remove: ReturnType<typeof vi.fn>
   millis: ReturnType<typeof vi.fn>
   setup?: () => void
@@ -36,6 +37,7 @@ function makeInstance(): FakeInstance {
     noStroke: vi.fn(),
     resizeCanvas: vi.fn(),
     pixelDensity: vi.fn(),
+    setAttributes: vi.fn(),
     remove: vi.fn(),
     millis: vi.fn(() => 0),
   }
