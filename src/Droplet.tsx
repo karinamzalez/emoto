@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import { useBackFaceFBO } from './hooks/useBackFaceFBO'
+import { buildBipyramidGeometry } from './lib/buildBipyramidGeometry'
+import { morphWeightFromCrystallinity } from './lib/morphWeightFromCrystallinity'
 
 export interface DropletMaterialDefaults {
   transmission: number
@@ -56,8 +58,9 @@ vec3 getVolumeTransmissionRay( const in vec3 n, const in vec3 v, const in float 
 }
 `
 
-// Window hook type used by Playwright tests to set material properties
+// Window hook types used by Playwright tests
 type SetMaterialFn = (props: Partial<THREE.MeshPhysicalMaterial>) => void
+type SetCrystallinityFn = (value: number | null) => void
 
 interface DropletProps {
   isDebug: boolean
@@ -70,6 +73,8 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
   const shaderRef = useRef<THREE.WebGLProgramParametersWithUniforms | null>(null)
   // Persists across R3F reconciliation — applied each frame in useFrame
   const frameOverrideRef = useRef<Partial<THREE.MeshPhysicalMaterial> | null>(null)
+  const crystallinityOverrideRef = useRef<number | null>(null)
+  const bipyramidGeoRef = useRef<THREE.BufferGeometry | null>(null)
   const defaults = dropletMaterialDefaults()
 
   const backFaceFBO = useBackFaceFBO(meshRef)
@@ -87,6 +92,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     iridescenceThicknessMin,
     iridescenceThicknessMax,
     chromaticAberration,
+    crystallinity,
   } = useControls('Droplet', {
     ior: { value: defaults.ior, min: 1, max: 2.5, step: 0.01 },
     roughness: { value: defaults.roughness, min: 0, max: 1, step: 0.01 },
@@ -100,6 +106,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     iridescenceThicknessMin: { value: 100, min: 0, max: 1000, step: 10, label: 'thickness min (nm)' },
     iridescenceThicknessMax: { value: 400, min: 0, max: 1000, step: 10, label: 'thickness max (nm)' },
     chromaticAberration: { value: 0.3, min: 0, max: 1, step: 0.01, label: 'chromatic aberration' },
+    crystallinity: { value: 0, min: 0, max: 1, step: 0.01 },
   })
 
   useImperativeHandle(ref, () => ({
@@ -110,10 +117,37 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     },
   }))
 
+  // Add bipyramid morph positions as custom vertex attributes on the icosphere.
+  // We use regular attributes (not morphAttributes) to avoid Three.js's morph target
+  // machinery, which requires morphTargetInfluences to be pre-initialized.
+  // The vertex shader (patched in onBeforeCompile) lerps between position/aMorphPos
+  // and normal/aMorphNormal based on the u_crystallinity uniform.
+  useEffect(() => {
+    const geo = meshRef.current?.geometry
+    if (!geo) return
+
+    const bipyramid = buildBipyramidGeometry(0.7, 1.1, 4)
+    bipyramidGeoRef.current = bipyramid
+
+    geo.setAttribute('aMorphPos', bipyramid.attributes.position as THREE.BufferAttribute)
+    geo.setAttribute('aMorphNormal', bipyramid.attributes.normal as THREE.BufferAttribute)
+
+    // Add u_crystallinity uniform to the already-compiled shader (first compile uses 0)
+    if (shaderRef.current && !shaderRef.current.uniforms.u_crystallinity) {
+      shaderRef.current.uniforms.u_crystallinity = { value: 0 }
+    }
+
+    return () => {
+      bipyramidGeoRef.current?.dispose()
+      bipyramidGeoRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     const w = window as Window & {
       __emotoFreezeDroplet?: (angle: number | null) => void
       __emotoSetMaterial?: SetMaterialFn
+      __emotoSetCrystallinity?: SetCrystallinityFn
     }
     w.__emotoFreezeDroplet = (angle) => {
       frozenY.current = angle
@@ -122,9 +156,13 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     w.__emotoSetMaterial = (props) => {
       frameOverrideRef.current = props ? { ...frameOverrideRef.current, ...props } : null
     }
+    w.__emotoSetCrystallinity = (value) => {
+      crystallinityOverrideRef.current = value
+    }
     return () => {
       delete w.__emotoFreezeDroplet
       delete w.__emotoSetMaterial
+      delete w.__emotoSetCrystallinity
     }
   }, [])
 
@@ -146,6 +184,11 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     if (shaderRef.current) {
       shaderRef.current.uniforms.tBackfaceNormals.value = backFaceFBO.texture
       shaderRef.current.uniforms.uResolution.value.set(size.width, size.height)
+      if (shaderRef.current.uniforms.u_crystallinity) {
+        shaderRef.current.uniforms.u_crystallinity.value = morphWeightFromCrystallinity(
+          crystallinityOverrideRef.current ?? crystallinity,
+        )
+      }
     }
   })
 
@@ -176,6 +219,25 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
 
           shader.uniforms.tBackfaceNormals = { value: null }
           shader.uniforms.uResolution = { value: new THREE.Vector2(800, 800) }
+          shader.uniforms.u_crystallinity = { value: 0 }
+
+          // Patch vertex shader: lerp position and normal toward bipyramid shape
+          shader.vertexShader =
+            `attribute vec3 aMorphPos;\n` +
+            `attribute vec3 aMorphNormal;\n` +
+            `uniform float u_crystallinity;\n` +
+            shader.vertexShader
+              .replace(
+                '#include <beginnormal_vertex>',
+                `vec3 objectNormal = normalize(mix(normal, aMorphNormal, u_crystallinity));
+#ifdef USE_TANGENT
+  vec3 objectTangent = vec3(tangent.xyz);
+#endif`,
+              )
+              .replace(
+                '#include <begin_vertex>',
+                `vec3 transformed = mix(position, aMorphPos, u_crystallinity);`,
+              )
 
           shader.fragmentShader =
             `uniform sampler2D tBackfaceNormals;\n` +
