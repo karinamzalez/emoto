@@ -34,6 +34,7 @@ export function dropletMaterialDefaults(): DropletMaterialDefaults {
 
 // GLSL replacement for getVolumeTransmissionRay — adds two-bounce refraction
 // via the back-face normal FBO so thickness-aware offsets use both surfaces.
+// Called once per channel when USE_DISPERSION is active (different IOR each time).
 const PATCHED_TRANSMISSION_RAY = /* glsl */ `
 vec3 getVolumeTransmissionRay( const in vec3 n, const in vec3 v, const in float thickness, const in float ior, const in mat4 modelMatrix ) {
   // Entry refraction: air → glass (single bounce from front-face normal)
@@ -55,6 +56,9 @@ vec3 getVolumeTransmissionRay( const in vec3 n, const in vec3 v, const in float 
 }
 `
 
+// Window hook type used by Playwright tests to set material properties
+type SetMaterialFn = (props: Partial<THREE.MeshPhysicalMaterial>) => void
+
 interface DropletProps {
   isDebug: boolean
 }
@@ -63,22 +67,40 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
   const meshRef = useRef<THREE.Mesh>(null)
   const matRef = useRef<THREE.MeshPhysicalMaterial>(null)
   const frozenY = useRef<number | null>(null)
-  // Holds the compiled shader uniforms so we can update them each frame
   const shaderRef = useRef<THREE.WebGLProgramParametersWithUniforms | null>(null)
+  // Persists across R3F reconciliation — applied each frame in useFrame
+  const frameOverrideRef = useRef<Partial<THREE.MeshPhysicalMaterial> | null>(null)
   const defaults = dropletMaterialDefaults()
 
   const backFaceFBO = useBackFaceFBO(meshRef)
 
-  const { ior, roughness, thickness, reflectivity, clearcoat, clearcoatRoughness, rotationSpeed } =
-    useControls('Droplet', {
-      ior: { value: defaults.ior, min: 1, max: 2.5, step: 0.01 },
-      roughness: { value: defaults.roughness, min: 0, max: 1, step: 0.01 },
-      thickness: { value: defaults.thickness, min: 0, max: 10, step: 0.1 },
-      reflectivity: { value: defaults.reflectivity, min: 0, max: 1, step: 0.01 },
-      clearcoat: { value: defaults.clearcoat, min: 0, max: 1, step: 0.01 },
-      clearcoatRoughness: { value: defaults.clearcoatRoughness, min: 0, max: 1, step: 0.01 },
-      rotationSpeed: { value: 0.1, min: 0, max: 2, step: 0.01, label: 'rotation speed' },
-    })
+  const {
+    ior,
+    roughness,
+    thickness,
+    reflectivity,
+    clearcoat,
+    clearcoatRoughness,
+    rotationSpeed,
+    iridescence,
+    iridescenceIOR,
+    iridescenceThicknessMin,
+    iridescenceThicknessMax,
+    chromaticAberration,
+  } = useControls('Droplet', {
+    ior: { value: defaults.ior, min: 1, max: 2.5, step: 0.01 },
+    roughness: { value: defaults.roughness, min: 0, max: 1, step: 0.01 },
+    thickness: { value: defaults.thickness, min: 0, max: 10, step: 0.1 },
+    reflectivity: { value: defaults.reflectivity, min: 0, max: 1, step: 0.01 },
+    clearcoat: { value: defaults.clearcoat, min: 0, max: 1, step: 0.01 },
+    clearcoatRoughness: { value: defaults.clearcoatRoughness, min: 0, max: 1, step: 0.01 },
+    rotationSpeed: { value: 0.1, min: 0, max: 2, step: 0.01, label: 'rotation speed' },
+    iridescence: { value: 0.3, min: 0, max: 1, step: 0.01 },
+    iridescenceIOR: { value: 1.3, min: 1, max: 2.5, step: 0.01, label: 'iridescence IOR' },
+    iridescenceThicknessMin: { value: 100, min: 0, max: 1000, step: 10, label: 'thickness min (nm)' },
+    iridescenceThicknessMax: { value: 400, min: 0, max: 1000, step: 10, label: 'thickness max (nm)' },
+    chromaticAberration: { value: 0.3, min: 0, max: 1, step: 0.01, label: 'chromatic aberration' },
+  })
 
   useImperativeHandle(ref, () => ({
     setMaterial(partial) {
@@ -89,17 +111,30 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
   }))
 
   useEffect(() => {
-    const w = window as Window & { __emotoFreezeDroplet?: (angle: number | null) => void }
+    const w = window as Window & {
+      __emotoFreezeDroplet?: (angle: number | null) => void
+      __emotoSetMaterial?: SetMaterialFn
+    }
     w.__emotoFreezeDroplet = (angle) => {
       frozenY.current = angle
     }
+    // Sets a per-frame override that survives R3F reconciliation
+    w.__emotoSetMaterial = (props) => {
+      frameOverrideRef.current = props ? { ...frameOverrideRef.current, ...props } : null
+    }
     return () => {
       delete w.__emotoFreezeDroplet
+      delete w.__emotoSetMaterial
     }
   }, [])
 
   useFrame(({ size }, delta) => {
-    // Rotation
+    // Apply frame-level overrides AFTER R3F reconciles JSX props
+    if (frameOverrideRef.current && matRef.current) {
+      Object.assign(matRef.current, frameOverrideRef.current)
+      matRef.current.needsUpdate = true
+    }
+
     if (meshRef.current) {
       if (frozenY.current !== null) {
         meshRef.current.rotation.y = frozenY.current
@@ -108,12 +143,16 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       }
     }
 
-    // Feed current FBO texture + resolution into the patched shader uniforms
     if (shaderRef.current) {
       shaderRef.current.uniforms.tBackfaceNormals.value = backFaceFBO.texture
       shaderRef.current.uniforms.uResolution.value.set(size.width, size.height)
     }
   })
+
+  // Three.js's USE_DISPERSION shader path calls getVolumeTransmissionRay once per
+  // channel with a slightly shifted IOR — our patched version handles this naturally.
+  // Scale chromaticAberration (0–1) to Three.js dispersion (Abbe-number-like, ~0–10).
+  const dispersion = chromaticAberration * 10
 
   return (
     <mesh ref={meshRef}>
@@ -128,14 +167,16 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
         clearcoat={clearcoat}
         clearcoatRoughness={clearcoatRoughness}
         reflectivity={reflectivity}
+        iridescence={iridescence}
+        iridescenceIOR={iridescenceIOR}
+        iridescenceThicknessRange={[iridescenceThicknessMin, iridescenceThicknessMax]}
+        dispersion={dispersion}
         onBeforeCompile={(shader) => {
           shaderRef.current = shader
 
-          // Declare custom uniforms
           shader.uniforms.tBackfaceNormals = { value: null }
           shader.uniforms.uResolution = { value: new THREE.Vector2(800, 800) }
 
-          // Prepend uniform declarations and replace getVolumeTransmissionRay
           shader.fragmentShader =
             `uniform sampler2D tBackfaceNormals;\n` +
             `uniform vec2 uResolution;\n` +

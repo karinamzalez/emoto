@@ -52,6 +52,31 @@ test('stripe deformation is visible — refracted pixels vary across droplet', a
     { timeout: 8000 },
   )
 
+  // Poll until stripe variance is visible (dispersion shader path is heavier under load)
+  await page.waitForFunction(
+    () => {
+      const src = document.querySelector('#r3f-canvas canvas') as HTMLCanvasElement | null
+      if (!src) return false
+      const gl =
+        (src.getContext('webgl2') as WebGL2RenderingContext | null) ??
+        (src.getContext('webgl') as WebGLRenderingContext | null)
+      if (!gl) return false
+      const cx = Math.floor(src.width / 2)
+      const cy = Math.floor(src.height / 2)
+      const sums: number[] = []
+      for (let dx = -80; dx <= 80; dx += 20) {
+        const px = new Uint8Array(4)
+        gl.readPixels(cx + dx, cy, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+        sums.push(px[0] + px[1] + px[2])
+      }
+      const min = Math.min(...sums)
+      const max = Math.max(...sums)
+      return max - min > 30
+    },
+    undefined,
+    { timeout: 10000 },
+  )
+
   const pixels = await readCenterPixels(page, 80)
 
   // Refracted stripes → pixel values vary across the horizontal band

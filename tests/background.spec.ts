@@ -58,6 +58,24 @@ test('?bg= custom background differs from default', async ({ page }) => {
 
   await page.goto('/?bg=/fixtures/test-bg.png')
   await waitForCanvas(page)
+
+  // Poll until the corner pixel is stable and non-zero (texture load + PMREM can be slow)
+  await page.waitForFunction(
+    () => {
+      const src = document.querySelector('#r3f-canvas canvas') as HTMLCanvasElement | null
+      if (!src) return false
+      const gl =
+        (src.getContext('webgl2') as WebGL2RenderingContext | null) ??
+        (src.getContext('webgl') as WebGLRenderingContext | null)
+      if (!gl) return false
+      const px = new Uint8Array(4)
+      gl.readPixels(8, 8, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px)
+      return px[0] + px[1] + px[2] > 0
+    },
+    undefined,
+    { timeout: 8000 },
+  )
+
   const customPixel = await readCornerPixel(page)
 
   const diff =
