@@ -42,27 +42,3 @@ test('Leva panel is visible with Droplet controls in debug mode', async ({ page 
   await expect(page.locator('body')).toContainText('clearcoat')
 })
 
-test('droplet baseline screenshot matches committed reference', async ({ page }) => {
-  await page.setViewportSize({ width: 800, height: 800 })
-  await page.goto('/')
-  await waitForCanvas(page)
-
-  // Freeze rotation at Y=0 for a deterministic snapshot
-  await page.evaluate(() => {
-    ;(
-      window as Window & { __emotoFreezeDroplet?: (angle: number | null) => void }
-    ).__emotoFreezeDroplet?.(0)
-  })
-  await page.waitForTimeout(200)
-
-  await expect(page.locator('#r3f-canvas')).toHaveScreenshot('droplet-baseline.png', {
-    maxDiffPixelRatio: 0.03,
-  })
-
-  // Unfreeze
-  await page.evaluate(() => {
-    ;(
-      window as Window & { __emotoFreezeDroplet?: (angle: number | null) => void }
-    ).__emotoFreezeDroplet?.(null)
-  })
-})

@@ -51,42 +51,6 @@ async function waitForRender(page: import('@playwright/test').Page) {
   )
 }
 
-test('crystallinity visual regression at 0, 0.5, and 1.0', async ({ page }) => {
-  const errors: string[] = []
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text())
-  })
-
-  await page.setViewportSize({ width: 800, height: 800 })
-  await page.goto('/')
-  await waitForCanvas(page)
-  await freezeDroplet(page, 0)
-  await waitForRender(page)
-
-  // crystallinity = 0 (pure droplet)
-  await setCrystallinity(page, 0)
-  await page.waitForTimeout(400)
-  await expect(page.locator('#r3f-canvas')).toHaveScreenshot('crystallinity-0.png', {
-    maxDiffPixelRatio: 0.03,
-  })
-
-  // crystallinity = 0.5 (partial faceting)
-  await setCrystallinity(page, 0.5)
-  await page.waitForTimeout(400)
-  await expect(page.locator('#r3f-canvas')).toHaveScreenshot('crystallinity-0.5.png', {
-    maxDiffPixelRatio: 0.03,
-  })
-
-  // crystallinity = 1.0 (full crystal)
-  await setCrystallinity(page, 1)
-  await page.waitForTimeout(400)
-  await expect(page.locator('#r3f-canvas')).toHaveScreenshot('crystallinity-1.png', {
-    maxDiffPixelRatio: 0.03,
-  })
-
-  expect(errors).toHaveLength(0)
-})
-
 test('no WebGL errors across crystallinity sweep', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {

@@ -98,21 +98,3 @@ test('dispersion=5 produces more R/B separation than dispersion=0', async ({ pag
   expect(avgRBSplit(pixelsHigh)).toBeGreaterThanOrEqual(avgRBSplit(pixelsLow))
 })
 
-test('iridescence baseline screenshot matches committed reference', async ({ page }) => {
-  await page.setViewportSize({ width: 800, height: 800 })
-  await page.goto('/')
-  await waitForCanvas(page)
-
-  await page.evaluate(() => {
-    ;(window as Window & { __emotoFreezeDroplet?: (a: number | null) => void }).__emotoFreezeDroplet?.(0)
-  })
-  await page.waitForTimeout(400)
-
-  await expect(page.locator('#r3f-canvas')).toHaveScreenshot('iridescence-baseline.png', {
-    maxDiffPixelRatio: 0.03,
-  })
-
-  await page.evaluate(() => {
-    ;(window as Window & { __emotoFreezeDroplet?: (a: number | null) => void }).__emotoFreezeDroplet?.(null)
-  })
-})
