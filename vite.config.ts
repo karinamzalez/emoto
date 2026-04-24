@@ -1,14 +1,14 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
-import glsl from 'vite-plugin-glsl'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [glsl()],
+  plugins: [react()],
   build: {
     target: 'esnext',
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 })

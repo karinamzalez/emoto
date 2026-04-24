@@ -1,15 +1,16 @@
-import { createSketch } from './sketch'
+import { createRoot } from 'react-dom/client'
+import { App } from './App'
 import { Mic } from './audio/Mic'
 import { AudioFeaturesSource } from './audio/AudioFeaturesSource'
 import { DebugOverlay } from './audio/DebugOverlay'
+
+createRoot(document.getElementById('root')!).render(<App />)
 
 const overlay = document.getElementById('mic-overlay') as HTMLDivElement
 const btnBegin = document.getElementById('btn-begin') as HTMLButtonElement
 const btnWatch = document.getElementById('btn-watch') as HTMLButtonElement
 const statusEl = document.getElementById('mic-status') as HTMLParagraphElement
 
-// Hide Watch-only option when user prefers reduced motion is NOT set
-// (show it as an explicit accessibility escape hatch when it IS set)
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 if (!prefersReduced) {
   btnWatch.style.display = 'none'
@@ -55,5 +56,3 @@ btnBegin.addEventListener('click', () => {
 btnWatch.addEventListener('click', () => {
   mic.startWatchOnly()
 })
-
-createSketch(document.body)
