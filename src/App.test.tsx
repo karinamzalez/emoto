@@ -11,7 +11,7 @@ describe('<Scene />', () => {
     await renderer.unmount()
   })
 
-  it('contains a mesh for the sanity cube', async () => {
+  it('contains a mesh (Droplet icosphere)', async () => {
     const renderer = await ReactThreeTestRenderer.create(
       <Scene backgroundUrl="" isDebug={false} />,
     )

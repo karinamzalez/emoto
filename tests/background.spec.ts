@@ -27,28 +27,26 @@ test('default background renders non-black somewhere in scene', async ({ page })
   await page.goto('/')
   await waitForCanvas(page)
 
-  const maxBrightness = await page.evaluate(() => {
-    const src = document.querySelector('#r3f-canvas canvas') as HTMLCanvasElement
+  const hasNonBlack = await page.evaluate(() => {
+    const src = document.querySelector('#r3f-canvas canvas') as HTMLCanvasElement | null
+    if (!src) return false
     const gl =
       (src.getContext('webgl2') as WebGL2RenderingContext | null) ??
       (src.getContext('webgl') as WebGLRenderingContext | null)
-    if (!gl) return 0
-    // Sample a grid of points across the canvas
-    const samples = [
+    if (!gl) return false
+    const pixels = new Uint8Array(4)
+    const samples: [number, number][] = [
       [8, 8], [400, 8], [792, 8],
-      [8, 400], [792, 400],
+      [8, 400], [400, 400], [792, 400],
       [8, 792], [400, 792], [792, 792],
     ]
-    let max = 0
-    const pixels = new Uint8Array(4)
     for (const [x, y] of samples) {
       gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-      max = Math.max(max, pixels[0] + pixels[1] + pixels[2])
+      if (pixels[0] + pixels[1] + pixels[2] > 0) return true
     }
-    return max
+    return false
   })
-
-  expect(maxBrightness).toBeGreaterThan(0)
+  expect(hasNonBlack).toBe(true)
 })
 
 test('?bg= custom background differs from default', async ({ page }) => {

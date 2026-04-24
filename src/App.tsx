@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Leva, useControls } from 'leva'
 import { SceneBackground } from './SceneBackground'
+import { Droplet } from './Droplet'
 
 function getQueryParam(key: string): string {
   return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
@@ -20,10 +21,7 @@ export function Scene({ backgroundUrl, isDebug }: { backgroundUrl: string; isDeb
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      <mesh>
-        <boxGeometry />
-        <meshStandardMaterial color="royalblue" />
-      </mesh>
+      <Droplet isDebug={isDebug} />
       <SceneBackground url={backgroundUrl || undefined} />
       {isDebug && <OrbitControls />}
     </>
