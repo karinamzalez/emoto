@@ -1,9 +1,20 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
+import { Leva, useControls } from 'leva'
+import { SceneBackground } from './SceneBackground'
 
-export function Scene() {
-  const isDebug =
-    import.meta.env.DEV || new URLSearchParams(globalThis.location?.search ?? '').has('debug')
+function getQueryParam(key: string): string {
+  return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
+}
+
+function isDebugMode(): boolean {
+  return (
+    import.meta.env.DEV ||
+    new URLSearchParams(globalThis.location?.search ?? '').has('debug')
+  )
+}
+
+export function Scene({ backgroundUrl, isDebug }: { backgroundUrl: string; isDebug: boolean }) {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
@@ -13,15 +24,28 @@ export function Scene() {
         <boxGeometry />
         <meshStandardMaterial color="royalblue" />
       </mesh>
+      <SceneBackground url={backgroundUrl || undefined} />
       {isDebug && <OrbitControls />}
     </>
   )
 }
 
 export function App() {
+  const debug = isDebugMode()
+  const { backgroundUrl } = useControls('Background', {
+    backgroundUrl: { value: getQueryParam('bg'), label: 'URL' },
+  })
+
   return (
-    <Canvas id="r3f-canvas" gl={{ preserveDrawingBuffer: true }} style={{ position: 'fixed', inset: 0 }}>
-      <Scene />
-    </Canvas>
+    <>
+      <Leva hidden={!debug} />
+      <Canvas
+        id="r3f-canvas"
+        gl={{ preserveDrawingBuffer: true }}
+        style={{ position: 'fixed', inset: 0 }}
+      >
+        <Scene backgroundUrl={debug ? backgroundUrl : getQueryParam('bg')} isDebug={debug} />
+      </Canvas>
+    </>
   )
 }
