@@ -3,6 +3,7 @@ import { App } from './App'
 import { Mic } from './audio/Mic'
 import { AudioFeaturesSource } from './audio/AudioFeaturesSource'
 import { DebugOverlay } from './audio/DebugOverlay'
+import { AudioMaterialPipeline } from './mapping/pipeline'
 
 createRoot(document.getElementById('root')!).render(<App />)
 
@@ -38,12 +39,39 @@ mic.onChange((state) => {
 
 mic.onReady(({ analyser, sampleRate }) => {
   const source = new AudioFeaturesSource(analyser, sampleRate)
+  const pipeline = new AudioMaterialPipeline()
   let lastT = performance.now()
+
+  const w = window as Window & {
+    __emotoSetMaterial?: (props: object) => void
+    __emotoSetCrystallinity?: (value: number | null) => void
+    __emotoSetDisplacement?: (value: number) => void
+    __emotoSetScale?: (value: number) => void
+  }
+
   function tick() {
     const now = performance.now()
-    const features = source.read(now - lastT)
+    const dtMs = now - lastT
     lastT = now
+
+    const features = source.read(dtMs)
     debugOverlay?.update(features)
+
+    if (!isDebugMode) {
+      const props = pipeline.tick(features, dtMs)
+      w.__emotoSetMaterial?.({
+        ior: props.ior,
+        iridescence: props.iridescence,
+        iridescenceIOR: props.iridescenceIOR,
+        iridescenceThicknessRange: [props.iridescenceThicknessMin, props.iridescenceThicknessMax] as [number, number],
+        thickness: props.thickness,
+        dispersion: props.chromaticAberration * 10,
+      })
+      w.__emotoSetCrystallinity?.(props.crystallinity)
+      w.__emotoSetDisplacement?.(props.displacement)
+      w.__emotoSetScale?.(props.scale)
+    }
+
     requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)

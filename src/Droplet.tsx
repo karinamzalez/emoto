@@ -58,9 +58,32 @@ vec3 getVolumeTransmissionRay( const in vec3 n, const in vec3 v, const in float 
 }
 `
 
+// DRE-36: 3D value noise for per-vertex surface micro-displacement along normal.
+// Three octaves give multi-scale ripple without visible tiling.
+const NOISE_GLSL = /* glsl */ `
+float _h3(vec3 p) {
+  p = fract(p * vec3(443.897, 441.423, 437.195));
+  p += dot(p, p.yzx + 19.19);
+  return fract((p.x + p.y) * p.z);
+}
+float _n3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(_h3(i), _h3(i + vec3(1,0,0)), f.x),
+        mix(_h3(i + vec3(0,1,0)), _h3(i + vec3(1,1,0)), f.x), f.y),
+    mix(mix(_h3(i + vec3(0,0,1)), _h3(i + vec3(1,0,1)), f.x),
+        mix(_h3(i + vec3(0,1,1)), _h3(i + vec3(1,1,1)), f.x), f.y),
+    f.z) * 2.0 - 1.0;
+}
+`
+
 // Window hook types used by Playwright tests
 type SetMaterialFn = (props: Partial<THREE.MeshPhysicalMaterial>) => void
 type SetCrystallinityFn = (value: number | null) => void
+type SetDisplacementFn = (value: number) => void
+type SetScaleFn = (value: number) => void
 
 interface DropletProps {
   isDebug: boolean
@@ -74,6 +97,8 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
   // Persists across R3F reconciliation — applied each frame in useFrame
   const frameOverrideRef = useRef<Partial<THREE.MeshPhysicalMaterial> | null>(null)
   const crystallinityOverrideRef = useRef<number | null>(null)
+  const displacementRef = useRef<number>(0)
+  const scaleRef = useRef<number>(1.0)
   const bipyramidGeoRef = useRef<THREE.BufferGeometry | null>(null)
   const defaults = dropletMaterialDefaults()
 
@@ -148,6 +173,8 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       __emotoFreezeDroplet?: (angle: number | null) => void
       __emotoSetMaterial?: SetMaterialFn
       __emotoSetCrystallinity?: SetCrystallinityFn
+      __emotoSetDisplacement?: SetDisplacementFn
+      __emotoSetScale?: SetScaleFn
     }
     w.__emotoFreezeDroplet = (angle) => {
       frozenY.current = angle
@@ -159,14 +186,25 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     w.__emotoSetCrystallinity = (value) => {
       crystallinityOverrideRef.current = value
     }
+    w.__emotoSetDisplacement = (value) => {
+      displacementRef.current = value
+    }
+    w.__emotoSetScale = (value) => {
+      scaleRef.current = value
+    }
     return () => {
       delete w.__emotoFreezeDroplet
       delete w.__emotoSetMaterial
       delete w.__emotoSetCrystallinity
+      delete w.__emotoSetDisplacement
+      delete w.__emotoSetScale
     }
   }, [])
 
   useFrame(({ size }, delta) => {
+    if (shaderRef.current?.uniforms.u_time) {
+      shaderRef.current.uniforms.u_time.value += delta
+    }
     // Apply frame-level overrides AFTER R3F reconciles JSX props
     if (frameOverrideRef.current && matRef.current) {
       Object.assign(matRef.current, frameOverrideRef.current)
@@ -179,6 +217,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       } else {
         meshRef.current.rotation.y += (isDebug ? rotationSpeed : 0.1) * delta
       }
+      meshRef.current.scale.setScalar(scaleRef.current)
     }
 
     if (shaderRef.current) {
@@ -188,6 +227,9 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
         shaderRef.current.uniforms.u_crystallinity.value = morphWeightFromCrystallinity(
           crystallinityOverrideRef.current ?? crystallinity,
         )
+      }
+      if (shaderRef.current.uniforms.u_displacement) {
+        shaderRef.current.uniforms.u_displacement.value = displacementRef.current
       }
     }
   })
@@ -220,12 +262,17 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
           shader.uniforms.tBackfaceNormals = { value: null }
           shader.uniforms.uResolution = { value: new THREE.Vector2(800, 800) }
           shader.uniforms.u_crystallinity = { value: 0 }
+          shader.uniforms.u_displacement = { value: 0 }
+          shader.uniforms.u_time = { value: 0 }
 
-          // Patch vertex shader: lerp position and normal toward bipyramid shape
+          // Patch vertex shader: lerp position/normal toward bipyramid + noise displacement
           shader.vertexShader =
             `attribute vec3 aMorphPos;\n` +
             `attribute vec3 aMorphNormal;\n` +
             `uniform float u_crystallinity;\n` +
+            `uniform float u_displacement;\n` +
+            `uniform float u_time;\n` +
+            NOISE_GLSL +
             shader.vertexShader
               .replace(
                 '#include <beginnormal_vertex>',
@@ -236,7 +283,13 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
               )
               .replace(
                 '#include <begin_vertex>',
-                `vec3 transformed = mix(position, aMorphPos, u_crystallinity);`,
+                `vec3 transformed = mix(position, aMorphPos, u_crystallinity);
+float _disp = (
+  _n3(transformed * 3.5 + u_time * 0.4) * 0.5 +
+  _n3(transformed * 7.0 - u_time * 0.6) * 0.3 +
+  _n3(transformed * 14.0 + u_time * 0.8) * 0.2
+);
+transformed += objectNormal * _disp * u_displacement * 0.05;`,
               )
 
           shader.fragmentShader =
