@@ -36,13 +36,13 @@ export function App() {
 
   return (
     <>
-      <Leva hidden={!debug} />
+      <Leva />
       <Canvas
         id="r3f-canvas"
         gl={{ preserveDrawingBuffer: true }}
         style={{ position: 'fixed', inset: 0 }}
       >
-        <Scene backgroundUrl={debug ? backgroundUrl : getQueryParam('bg')} isDebug={debug} />
+        <Scene backgroundUrl={backgroundUrl} isDebug={debug} />
       </Canvas>
     </>
   )
