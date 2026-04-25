@@ -45,6 +45,7 @@ mic.onReady(({ analyser, sampleRate }) => {
   const w = window as Window & {
     __emotoSetMaterial?: (props: object) => void
     __emotoSetCrystallinity?: (value: number | null) => void
+    __emotoSetDisplacement?: (value: number) => void
   }
 
   function tick() {
@@ -66,6 +67,7 @@ mic.onReady(({ analyser, sampleRate }) => {
         dispersion: props.chromaticAberration * 10,
       })
       w.__emotoSetCrystallinity?.(props.crystallinity)
+      w.__emotoSetDisplacement?.(props.displacement)
     }
 
     requestAnimationFrame(tick)

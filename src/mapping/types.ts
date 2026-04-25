@@ -9,6 +9,7 @@ export interface DropletAudioProps {
   thickness: number
   chromaticAberration: number
   crystallinity: number
+  displacement: number
 }
 
 export type Mapping = (features: AudioFeatures) => Partial<DropletAudioProps>
