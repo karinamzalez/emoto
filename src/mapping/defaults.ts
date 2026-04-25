@@ -1,20 +1,24 @@
 import type { AudioFeatures } from '../audio/AudioFeaturesSource'
 import type { DropletAudioProps, Mapping } from './types'
 
-export const PROP_EASING: Record<keyof DropletAudioProps, { attackMs: number; releaseMs: number }> =
-  {
-    ior: { attackMs: 50, releaseMs: 400 },
-    iridescence: { attackMs: 80, releaseMs: 600 },
-    iridescenceIOR: { attackMs: 80, releaseMs: 400 },
-    iridescenceThicknessMin: { attackMs: 100, releaseMs: 500 },
-    iridescenceThicknessMax: { attackMs: 100, releaseMs: 500 },
-    thickness: { attackMs: 60, releaseMs: 500 },
-    chromaticAberration: { attackMs: 50, releaseMs: 300 },
-    // DRE-39: attack ~80ms (satisfies >0.8 within 200ms); release ~800ms for musical linger
-    crystallinity: { attackMs: 80, releaseMs: 800 },
-    // DRE-36: fast attack for responsiveness, moderate release
-    displacement: { attackMs: 60, releaseMs: 300 },
-  }
+// `scale` is driven by sustainedDuration in the pipeline (not via generic easing), so it is
+// intentionally absent from PROP_EASING.
+export const PROP_EASING: Omit<
+  Record<keyof DropletAudioProps, { attackMs: number; releaseMs: number }>,
+  'scale'
+> = {
+  ior: { attackMs: 50, releaseMs: 400 },
+  iridescence: { attackMs: 80, releaseMs: 600 },
+  iridescenceIOR: { attackMs: 80, releaseMs: 400 },
+  iridescenceThicknessMin: { attackMs: 100, releaseMs: 500 },
+  iridescenceThicknessMax: { attackMs: 100, releaseMs: 500 },
+  thickness: { attackMs: 60, releaseMs: 500 },
+  chromaticAberration: { attackMs: 50, releaseMs: 300 },
+  // DRE-39: attack 80ms satisfies >0.8 within 200ms; release 800ms for musical linger
+  crystallinity: { attackMs: 80, releaseMs: 800 },
+  // DRE-36: fast attack for responsiveness, moderate release
+  displacement: { attackMs: 60, releaseMs: 300 },
+}
 
 export const INITIAL_PROPS: DropletAudioProps = {
   ior: 1.33,
@@ -26,6 +30,19 @@ export const INITIAL_PROPS: DropletAudioProps = {
   chromaticAberration: 0.3,
   crystallinity: 0,
   displacement: 0,
+  scale: 1.0,
+}
+
+// DRE-40: coherence threshold and scale growth constants
+export const HARMONY_THRESHOLD = 0.6
+export const NOISE_FLOOR = 0.02
+export const SCALE_ATTACK_MS = 200
+export const SCALE_RELEASE_MS = 1500
+
+// Exponential approach to 1.3× — grows quickly past 3s, plateaus naturally.
+// scaleFromDuration(4) ≈ 1.24 (satisfies >1.2 within 4s test).
+export function scaleFromDuration(durationSec: number): number {
+  return 1.0 + 0.3 * (1 - Math.exp(-durationSec / 2.5))
 }
 
 const LOG_PITCH_LOW = Math.log(80)
@@ -58,8 +75,6 @@ export function centroidToThicknessDelta(centroidHz: number): number {
   )
   return (t - 0.5) * 2 * CENTROID_DELTA_MAX
 }
-
-const NOISE_FLOOR = 0.02
 
 // DRE-36: amplitude → thickness (breathing) + chromatic aberration + displacement
 const amplitudeMapping: Mapping = (f: AudioFeatures) => ({

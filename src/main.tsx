@@ -46,6 +46,7 @@ mic.onReady(({ analyser, sampleRate }) => {
     __emotoSetMaterial?: (props: object) => void
     __emotoSetCrystallinity?: (value: number | null) => void
     __emotoSetDisplacement?: (value: number) => void
+    __emotoSetScale?: (value: number) => void
   }
 
   function tick() {
@@ -68,6 +69,7 @@ mic.onReady(({ analyser, sampleRate }) => {
       })
       w.__emotoSetCrystallinity?.(props.crystallinity)
       w.__emotoSetDisplacement?.(props.displacement)
+      w.__emotoSetScale?.(props.scale)
     }
 
     requestAnimationFrame(tick)

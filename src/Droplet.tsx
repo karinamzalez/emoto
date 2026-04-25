@@ -83,6 +83,7 @@ float _n3(vec3 p) {
 type SetMaterialFn = (props: Partial<THREE.MeshPhysicalMaterial>) => void
 type SetCrystallinityFn = (value: number | null) => void
 type SetDisplacementFn = (value: number) => void
+type SetScaleFn = (value: number) => void
 
 interface DropletProps {
   isDebug: boolean
@@ -97,6 +98,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
   const frameOverrideRef = useRef<Partial<THREE.MeshPhysicalMaterial> | null>(null)
   const crystallinityOverrideRef = useRef<number | null>(null)
   const displacementRef = useRef<number>(0)
+  const scaleRef = useRef<number>(1.0)
   const bipyramidGeoRef = useRef<THREE.BufferGeometry | null>(null)
   const defaults = dropletMaterialDefaults()
 
@@ -172,6 +174,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       __emotoSetMaterial?: SetMaterialFn
       __emotoSetCrystallinity?: SetCrystallinityFn
       __emotoSetDisplacement?: SetDisplacementFn
+      __emotoSetScale?: SetScaleFn
     }
     w.__emotoFreezeDroplet = (angle) => {
       frozenY.current = angle
@@ -186,11 +189,15 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
     w.__emotoSetDisplacement = (value) => {
       displacementRef.current = value
     }
+    w.__emotoSetScale = (value) => {
+      scaleRef.current = value
+    }
     return () => {
       delete w.__emotoFreezeDroplet
       delete w.__emotoSetMaterial
       delete w.__emotoSetCrystallinity
       delete w.__emotoSetDisplacement
+      delete w.__emotoSetScale
     }
   }, [])
 
@@ -210,6 +217,7 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       } else {
         meshRef.current.rotation.y += (isDebug ? rotationSpeed : 0.1) * delta
       }
+      meshRef.current.scale.setScalar(scaleRef.current)
     }
 
     if (shaderRef.current) {
