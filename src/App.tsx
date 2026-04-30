@@ -23,7 +23,7 @@ export function Scene({ backgroundUrl, isDebug }: { backgroundUrl: string; isDeb
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <Droplet isDebug={isDebug} />
       <SceneBackground url={backgroundUrl || undefined} />
-      {isDebug && <OrbitControls />}
+      <OrbitControls />
     </>
   )
 }
