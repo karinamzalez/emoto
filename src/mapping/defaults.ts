@@ -1,5 +1,6 @@
 import type { AudioFeatures } from '../audio/AudioFeaturesSource'
 import type { DropletAudioProps, Mapping } from './types'
+import type { Oscillator } from '../animation/Oscillators'
 
 // `scale` is driven by sustainedDuration in the pipeline (not via generic easing), so it is
 // intentionally absent from PROP_EASING.
@@ -109,3 +110,56 @@ export const DEFAULT_MAPPINGS: Mapping[] = [
   centroidMapping,
   harmonicityMapping,
 ]
+
+// DRE-112: Default LFO config — periods are chosen to be pairwise coprime in
+// the sense that no simple rational ratio repeats within a viewer's attention span.
+// crystallinity and CA growth props are NOT oscillated — those are audio-owned.
+export function createDefaultOscillators(): Oscillator[] {
+  return [
+    {
+      target: 'rotation.y',
+      waveform: 'sine',
+      period: 22,
+      amplitude: Math.PI / 6,
+      phase: 0,
+      enabled: true,
+      seed: Math.random(),
+    },
+    {
+      target: 'rotation.x',
+      waveform: 'sine',
+      period: 17,
+      amplitude: (5 * Math.PI) / 180,
+      phase: 0,
+      enabled: true,
+      seed: Math.random(),
+    },
+    {
+      target: 'material.roughness',
+      waveform: 'perlin',
+      period: 8,
+      amplitude: 0.05,
+      phase: 0,
+      enabled: true,
+      seed: Math.random(),
+    },
+    {
+      target: 'material.thickness',
+      waveform: 'perlin',
+      period: 12,
+      amplitude: 0.1,
+      phase: 0,
+      enabled: true,
+      seed: Math.random(),
+    },
+    {
+      target: 'material.iridescenceIOR',
+      waveform: 'sine',
+      period: 9,
+      amplitude: 0.02,
+      phase: 0,
+      enabled: true,
+      seed: Math.random(),
+    },
+  ]
+}

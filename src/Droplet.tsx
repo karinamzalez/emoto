@@ -79,11 +79,13 @@ float _n3(vec3 p) {
 }
 `
 
-// Window hook types used by Playwright tests
+// Window hook types used by Playwright tests and audio pipeline
 type SetMaterialFn = (props: Partial<THREE.MeshPhysicalMaterial>) => void
 type SetCrystallinityFn = (value: number | null) => void
 type SetDisplacementFn = (value: number) => void
 type SetScaleFn = (value: number) => void
+type SetRotationOffsetFn = (x: number, y: number) => void
+type GetRotationFn = () => { x: number; y: number }
 
 interface DropletProps {
   isDebug: boolean
@@ -104,6 +106,11 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(
   const crystallinityOverrideRef = useRef<number | null>(null)
   const displacementRef = useRef<number>(0)
   const scaleRef = useRef<number>(1.0)
+  // Accumulated spin rotation tracked separately so LFO offset is additive
+  const spinYRef = useRef<number>(0)
+  // LFO rotation offsets (absolute deltas from audio pipeline LFO bus)
+  const lfoRotXRef = useRef<number>(0)
+  const lfoRotYRef = useRef<number>(0)
   const bipyramidGeoRef = useRef<THREE.BufferGeometry | null>(null)
   const defaults = dropletMaterialDefaults()
 
@@ -180,6 +187,8 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(
       __emotoSetCrystallinity?: SetCrystallinityFn
       __emotoSetDisplacement?: SetDisplacementFn
       __emotoSetScale?: SetScaleFn
+      __emotoSetRotationOffset?: SetRotationOffsetFn
+      __emotoGetRotation?: GetRotationFn
     }
     w.__emotoFreezeDroplet = (angle) => {
       frozenY.current = angle
@@ -197,12 +206,22 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(
     w.__emotoSetScale = (value) => {
       scaleRef.current = value
     }
+    w.__emotoSetRotationOffset = (x, y) => {
+      lfoRotXRef.current = x
+      lfoRotYRef.current = y
+    }
+    w.__emotoGetRotation = () => ({
+      x: meshRef.current?.rotation.x ?? 0,
+      y: meshRef.current?.rotation.y ?? 0,
+    })
     return () => {
       delete w.__emotoFreezeDroplet
       delete w.__emotoSetMaterial
       delete w.__emotoSetCrystallinity
       delete w.__emotoSetDisplacement
       delete w.__emotoSetScale
+      delete w.__emotoSetRotationOffset
+      delete w.__emotoGetRotation
     }
   }, [])
 
@@ -220,8 +239,12 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(
       if (frozenY.current !== null) {
         meshRef.current.rotation.y = frozenY.current
       } else {
-        meshRef.current.rotation.y += (isDebug ? rotationSpeed : 0.1) * delta
+        spinYRef.current += (isDebug ? rotationSpeed : 0.1) * delta
+        // LFO adds an absolute angular offset on top of the constant spin
+        meshRef.current.rotation.y = spinYRef.current + lfoRotYRef.current
       }
+      // LFO tilt — no base X rotation; LFO provides ambient ±5° breathing
+      meshRef.current.rotation.x = lfoRotXRef.current
       meshRef.current.scale.setScalar(scaleRef.current)
     }
 
