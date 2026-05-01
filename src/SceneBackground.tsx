@@ -70,7 +70,7 @@ export function SceneBackground({ url }: Props) {
             ctx.drawImage(img as CanvasImageSource, x, y)
           }
         }
-        tex.image = offscreen.transferToImageBitmap()
+        tex.image = offscreen.transferToImageBitmap() as unknown as HTMLImageElement
         tex.needsUpdate = true
 
         bgTex = tex
