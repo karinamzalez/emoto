@@ -34,26 +34,6 @@ function applyPmremBackground(
   }
 }
 
-// UV-space cover transform: fills canvas without stretching, cropping edges as needed.
-function coverUV(tex: THREE.Texture, canvasAspect: number) {
-  const img = tex.image as { width: number; height: number }
-  const imageAspect = img.width / img.height
-  if (imageAspect > canvasAspect) {
-    // Image wider than canvas — fit height, crop sides
-    const scale = canvasAspect / imageAspect
-    tex.repeat.set(scale, 1)
-    tex.offset.set((1 - scale) / 2, 0)
-  } else {
-    // Image taller than canvas — fit width, crop top/bottom
-    const scale = imageAspect / canvasAspect
-    tex.repeat.set(1, scale)
-    tex.offset.set(0, (1 - scale) / 2)
-  }
-  tex.wrapS = THREE.ClampToEdgeWrapping
-  tex.wrapT = THREE.ClampToEdgeWrapping
-  tex.needsUpdate = true
-}
-
 export function SceneBackground({ url }: Props) {
   const { scene, gl } = useThree()
 
@@ -71,13 +51,11 @@ export function SceneBackground({ url }: Props) {
         applyPmremBackground(texture, gl, scene, (t) => { envmap = t }, cancelled)
       })
     } else {
-      // Regular images: show full image as flat background (cover mode),
-      // generate PMREM separately for environment/reflections only.
+      // Regular images: fill canvas (no cover crop — image stretches to fill at native aspect).
+      // Generate PMREM separately for environment/reflections only.
       new THREE.TextureLoader().load(url, (tex) => {
         if (isCancelled) { tex.dispose(); return }
 
-        // Background: full image, cover mode (no panoramic zoom)
-        coverUV(tex, gl.domElement.width / gl.domElement.height)
         scene.background = tex
         bgTex = tex
 
