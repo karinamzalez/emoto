@@ -5,6 +5,7 @@ import { Leva, useControls } from 'leva'
 import { SceneBackground } from './SceneBackground'
 import { Crystal } from './Crystal'
 import { ReiterCA, type ReiterCAHandle } from './gfx/sim/ReiterCA'
+import { LfoPanel } from './animation/LfoPanel'
 
 function getQueryParam(key: string): string {
   return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
@@ -55,6 +56,7 @@ export function App() {
   return (
     <>
       <Leva />
+      <LfoPanel />
       <Canvas
         id="r3f-canvas"
         gl={{ preserveDrawingBuffer: true }}
