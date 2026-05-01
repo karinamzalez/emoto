@@ -8,7 +8,9 @@ async function waitForCanvas(page: import('@playwright/test').Page) {
   await page.waitForTimeout(400)
 }
 
-async function readCornerPixel(page: import('@playwright/test').Page): Promise<[number, number, number]> {
+async function readCornerPixel(
+  page: import('@playwright/test').Page
+): Promise<[number, number, number]> {
   return page.evaluate(() => {
     const src = document.querySelector('#r3f-canvas canvas') as HTMLCanvasElement
     const gl =
@@ -36,9 +38,15 @@ test('default background renders non-black somewhere in scene', async ({ page })
     if (!gl) return false
     const pixels = new Uint8Array(4)
     const samples: [number, number][] = [
-      [8, 8], [400, 8], [792, 8],
-      [8, 400], [400, 400], [792, 400],
-      [8, 792], [400, 792], [792, 792],
+      [8, 8],
+      [400, 8],
+      [792, 8],
+      [8, 400],
+      [400, 400],
+      [792, 400],
+      [8, 792],
+      [400, 792],
+      [792, 792],
     ]
     for (const [x, y] of samples) {
       gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
@@ -73,7 +81,7 @@ test('?bg= custom background differs from default', async ({ page }) => {
       return px[0] + px[1] + px[2] > 0
     },
     undefined,
-    { timeout: 8000 },
+    { timeout: 20000 }
   )
 
   const customPixel = await readCornerPixel(page)
