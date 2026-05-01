@@ -46,20 +46,37 @@ export function SceneBackground({ url }: Props) {
     if (!url) {
       scene.background = new THREE.Color(0x3a4090)
     } else if (resolveBackgroundSource(url) === 'rgbe') {
-      // HDR panoramas: full PMREM pipeline (they really are 360° images)
       new RGBELoader().load(url, (texture) => {
         applyPmremBackground(texture, gl, scene, (t) => { envmap = t }, cancelled)
       })
     } else {
-      // Regular images: fill canvas (no cover crop — image stretches to fill at native aspect).
-      // Generate PMREM separately for environment/reflections only.
       new THREE.TextureLoader().load(url, (tex) => {
         if (isCancelled) { tex.dispose(); return }
 
-        scene.background = tex
-        bgTex = tex
+        const img = tex.image as HTMLImageElement | ImageBitmap
+        const iw = 'naturalWidth' in img ? img.naturalWidth : img.width
+        const ih = 'naturalHeight' in img ? img.naturalHeight : img.height
+        const w = gl.domElement.clientWidth
+        const h = gl.domElement.clientHeight
 
-        // Environment map: clone → equirectangular → PMREM for reflections
+        // Replace the image on the TextureLoader-created texture object in-place.
+        // Preserves all internal texture state (colorSpace, version tracking) that
+        // Three.js uses when setting up the background planeMesh — any new texture
+        // object deviates from that baseline and silently breaks crystal transmission.
+        const offscreen = new OffscreenCanvas(w, h)
+        const ctx = offscreen.getContext('2d', { colorSpace: 'srgb' })!
+        for (let y = 0; y < h; y += ih) {
+          for (let x = 0; x < w; x += iw) {
+            ctx.drawImage(img as CanvasImageSource, x, y)
+          }
+        }
+        tex.image = offscreen.transferToImageBitmap()
+        tex.needsUpdate = true
+
+        bgTex = tex
+        scene.background = tex
+
+        // Environment map for reflections
         const envTex = tex.clone()
         envTex.mapping = THREE.EquirectangularReflectionMapping
         envTex.needsUpdate = true
