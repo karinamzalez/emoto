@@ -3,9 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Leva, useControls } from 'leva'
 import { SceneBackground } from './SceneBackground'
-import { Droplet } from './Droplet'
+import { Crystal } from './Crystal'
 import { ReiterCA, type ReiterCAHandle } from './gfx/sim/ReiterCA'
-import { CrystalMesh } from './gfx/CrystalMesh'
 
 function getQueryParam(key: string): string {
   return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
@@ -34,15 +33,12 @@ export function Scene({
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      {showDroplet && <Droplet isDebug={isDebug} />}
-      <ReiterCA
-        ref={caRef}
-        growthRate={1}
-        maxIterations={200}
-        seed={42}
-        debug={isDebug}
+      <ReiterCA ref={caRef} growthRate={1} maxIterations={200} seed={42} debug={isDebug} />
+      <Crystal
+        crystallinity={showDroplet ? undefined : 1}
+        getDensityTexture={() => caRef.current?.densityTexture ?? null}
+        isDebug={isDebug}
       />
-      <CrystalMesh getDensityTexture={() => caRef.current?.densityTexture ?? null} />
       <SceneBackground url={backgroundUrl || undefined} />
       <OrbitControls />
     </>

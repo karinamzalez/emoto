@@ -76,9 +76,11 @@ vec3 getVolumeTransmissionRay( const in vec3 n, const in vec3 v, const in float 
 interface CrystalMeshProps {
   /** Called each frame to retrieve the latest ping-pong FBO output texture. */
   getDensityTexture: () => THREE.Texture | null
+  /** 0..1 opacity for crossfade blending; drives transparent flag automatically. */
+  opacityOverride?: number
 }
 
-export function CrystalMesh({ getDensityTexture }: CrystalMeshProps) {
+export function CrystalMesh({ getDensityTexture, opacityOverride }: CrystalMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const matRef = useRef<THREE.MeshPhysicalMaterial>(null)
   const shaderRef = useRef<THREE.WebGLProgramParametersWithUniforms | null>(null)
@@ -143,6 +145,14 @@ export function CrystalMesh({ getDensityTexture }: CrystalMeshProps) {
       shaderRef.current.uniforms.uTipBoost.value = tipBoost
       shaderRef.current.uniforms.tBackfaceNormals.value = backFaceFBO.texture
       shaderRef.current.uniforms.uResolution.value.set(size.width, size.height)
+    }
+    if (matRef.current && opacityOverride !== undefined) {
+      const needsTransparent = opacityOverride < 1
+      if (matRef.current.transparent !== needsTransparent) {
+        matRef.current.transparent = needsTransparent
+        matRef.current.needsUpdate = true
+      }
+      matRef.current.opacity = opacityOverride
     }
   })
 

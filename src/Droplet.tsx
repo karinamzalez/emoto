@@ -87,9 +87,14 @@ type SetScaleFn = (value: number) => void
 
 interface DropletProps {
   isDebug: boolean
+  /** Overrides the Leva crystallinity slider for shape morphing (icosphere → bipyramid). */
+  crystallinityProp?: number
+  /** 0..1 opacity for crossfade blending; drives transparent flag automatically. */
+  opacityOverride?: number
 }
 
-export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref) => {
+export const Droplet = forwardRef<DropletHandle, DropletProps>(
+  ({ isDebug, crystallinityProp, opacityOverride }, ref) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const matRef = useRef<THREE.MeshPhysicalMaterial>(null)
   const frozenY = useRef<number | null>(null)
@@ -220,12 +225,21 @@ export const Droplet = forwardRef<DropletHandle, DropletProps>(({ isDebug }, ref
       meshRef.current.scale.setScalar(scaleRef.current)
     }
 
+    if (matRef.current && opacityOverride !== undefined) {
+      const needsTransparent = opacityOverride < 1
+      if (matRef.current.transparent !== needsTransparent) {
+        matRef.current.transparent = needsTransparent
+        matRef.current.needsUpdate = true
+      }
+      matRef.current.opacity = opacityOverride
+    }
+
     if (shaderRef.current) {
       shaderRef.current.uniforms.tBackfaceNormals.value = backFaceFBO.texture
       shaderRef.current.uniforms.uResolution.value.set(size.width, size.height)
       if (shaderRef.current.uniforms.u_crystallinity) {
         shaderRef.current.uniforms.u_crystallinity.value = morphWeightFromCrystallinity(
-          crystallinityOverrideRef.current ?? crystallinity,
+          crystallinityOverrideRef.current ?? crystallinityProp ?? crystallinity,
         )
       }
       if (shaderRef.current.uniforms.u_displacement) {
