@@ -3,6 +3,7 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Leva, useControls } from 'leva'
 import { SceneBackground } from './SceneBackground'
 import { Droplet } from './Droplet'
+import { ReiterCA } from './gfx/sim/ReiterCA'
 
 function getQueryParam(key: string): string {
   return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
@@ -24,6 +25,7 @@ export function Scene({ backgroundUrl, isDebug }: { backgroundUrl: string; isDeb
       <Droplet isDebug={isDebug} />
       <SceneBackground url={backgroundUrl || undefined} />
       <OrbitControls />
+      {isDebug && <ReiterCA growthRate={1} maxIterations={100} seed={42} debug={true} />}
     </>
   )
 }

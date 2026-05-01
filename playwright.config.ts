@@ -5,11 +5,11 @@ export default defineConfig({
   // Omit {platform} so one committed baseline works on macOS and Linux CI.
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:9000',
   },
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:9000',
     reuseExistingServer: !process.env['CI'],
   },
   projects: [

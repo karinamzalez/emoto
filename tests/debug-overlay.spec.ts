@@ -30,5 +30,5 @@ test('debug overlay is not created without debug flag in prod-like mode', async 
   // Note: dev server runs in DEV mode so this test is skipped in local dev
   await page.goto('/')
   // In dev mode the overlay will exist; in prod it won't. We only assert no crash.
-  await expect(page).toHaveURL('http://localhost:5173/')
+  await expect(page).toHaveURL('/')
 })
