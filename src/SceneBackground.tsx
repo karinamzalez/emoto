@@ -56,28 +56,29 @@ export function SceneBackground({ url }: Props) {
         const img = tex.image as HTMLImageElement | ImageBitmap
         const iw = 'naturalWidth' in img ? img.naturalWidth : img.width
         const ih = 'naturalHeight' in img ? img.naturalHeight : img.height
-        const w = gl.domElement.clientWidth
-        const h = gl.domElement.clientHeight
+        const w = gl.domElement.clientWidth || gl.domElement.width
+        const h = gl.domElement.clientHeight || gl.domElement.height
 
-        // Replace the image on the TextureLoader-created texture object in-place.
-        // Preserves all internal texture state (colorSpace, version tracking) that
-        // Three.js uses when setting up the background planeMesh — any new texture
-        // object deviates from that baseline and silently breaks crystal transmission.
-        const offscreen = new OffscreenCanvas(w, h)
-        const ctx = offscreen.getContext('2d', { colorSpace: 'srgb' })!
-        for (let y = 0; y < h; y += ih) {
-          for (let x = 0; x < w; x += iw) {
-            ctx.drawImage(img as CanvasImageSource, x, y)
-          }
-        }
-        tex.image = offscreen.transferToImageBitmap() as unknown as HTMLImageElement
+        // Tile at native pixel scale via UV repeat. Mutating tex.image would replace
+        // the HTMLImageElement with an ImageBitmap of a different size, which conflicts
+        // with Three.js's immutable texStorage2D allocation and silently breaks crystal
+        // transmission. Using wrapS/wrapT + repeat keeps the original image intact.
+        // colorSpace must be set explicitly — TextureLoader leaves it as NoColorSpace,
+        // which makes WebGLBackground set toneMapped=true on the planeMesh and apply
+        // ACESFilmic tone mapping to the background, washing out all values to ~226.
+        tex.colorSpace = THREE.SRGBColorSpace
+        tex.wrapS = THREE.RepeatWrapping
+        tex.wrapT = THREE.RepeatWrapping
+        tex.repeat.set(w / iw, h / ih)
         tex.needsUpdate = true
 
         bgTex = tex
         scene.background = tex
 
-        // Environment map for reflections
-        const envTex = tex.clone()
+        // Environment map for reflections — new THREE.Texture so envTex has its own Source.
+        // tex.clone() would share tex.source; when envTex.dispose() drops usedTimes to 0 it
+        // deletes the shared GL texture, leaving tex with an empty handle on first render.
+        const envTex = new THREE.Texture(img as HTMLImageElement)
         envTex.mapping = THREE.EquirectangularReflectionMapping
         envTex.needsUpdate = true
         try {
