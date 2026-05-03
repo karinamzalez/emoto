@@ -22,11 +22,24 @@ export class AudioMaterialPipeline {
     this.smoothed = { ...INITIAL_PROPS }
   }
 
-  tick(features: AudioFeatures, dtMs: number): DropletAudioProps {
+  tick(
+    features: AudioFeatures,
+    dtMs: number,
+    lfoDeltas?: Partial<DropletAudioProps>
+  ): DropletAudioProps {
     // Merge all mappings into a single raw target frame
     const raw: Partial<DropletAudioProps> = {}
     for (const mapping of this.mappings) {
       Object.assign(raw, mapping(features))
+    }
+
+    // Sum LFO deltas before easing: finalValue = baseDefault + audioDelta + lfoDelta
+    if (lfoDeltas) {
+      for (const k of Object.keys(lfoDeltas) as (keyof DropletAudioProps)[]) {
+        const delta = lfoDeltas[k]
+        if (delta === undefined) continue
+        raw[k] = (raw[k] ?? INITIAL_PROPS[k]) + delta
+      }
     }
 
     // Apply per-prop asymmetric easing for all props in PROP_EASING

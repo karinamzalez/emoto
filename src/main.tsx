@@ -94,15 +94,18 @@ mic.onReady(({ analyser, sampleRate }) => {
     debugOverlay?.update(features)
 
     if (!isDebugMode) {
-      const props = pipeline.tick(features, dtMs)
       const lfo = cachedLfoFrame
+      const props = pipeline.tick(features, dtMs, {
+        thickness: lfo.thickness,
+        iridescenceIOR: lfo.iridescenceIOR,
+      })
 
       w.__emotoSetMaterial?.({
         ior: props.ior,
         iridescence: props.iridescence,
-        iridescenceIOR: props.iridescenceIOR + lfo.iridescenceIOR,
+        iridescenceIOR: props.iridescenceIOR,
         iridescenceThicknessRange: [props.iridescenceThicknessMin, props.iridescenceThicknessMax] as [number, number],
-        thickness: props.thickness + lfo.thickness,
+        thickness: props.thickness,
         dispersion: props.chromaticAberration * 10,
         roughness: BASE_ROUGHNESS + lfo.roughness,
       })
