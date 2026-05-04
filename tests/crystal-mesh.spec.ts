@@ -4,6 +4,7 @@ type CrystalWindow = Window & {
   __emotoCrystalFreeze?: (angle: number | null) => void
   __emotoReiterIter?: number
   __emotoSetCaGrowthRate?: (v: number) => void
+  __emotoSetCaMaxIterations?: (v: number) => void
 }
 
 async function waitForCanvas(page: import('@playwright/test').Page) {
@@ -15,8 +16,11 @@ async function waitForCanvas(page: import('@playwright/test').Page) {
 }
 
 async function waitForCA(page: import('@playwright/test').Page, minIter = 50) {
-  // CA starts frozen (audio-driven); force growthRate=1 so tests don't need a mic.
-  await page.evaluate(() => (window as CrystalWindow).__emotoSetCaGrowthRate?.(1))
+  // CA starts frozen (audio-driven); force growthRate=1 and a high cap so tests don't need a mic.
+  await page.evaluate(() => {
+    ;(window as CrystalWindow).__emotoSetCaGrowthRate?.(1)
+    ;(window as CrystalWindow).__emotoSetCaMaxIterations?.(300)
+  })
   await page.waitForFunction(
     (n: number) => ((window as CrystalWindow).__emotoReiterIter ?? 0) >= n,
     minIter,

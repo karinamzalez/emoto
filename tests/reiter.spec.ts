@@ -12,11 +12,15 @@ type ReiterWindow = Window & {
   __emotoReiterIter?: number
   __emotoReiterDensityAt?: (col: number, row: number) => number
   __emotoSetCaGrowthRate?: (v: number) => void
+  __emotoSetCaMaxIterations?: (v: number) => void
 }
 
-// CA starts frozen (audio-driven); force growthRate=1 so tests don't need a mic.
+// CA starts frozen (audio-driven); force growthRate=1 and a high cap so tests don't need a mic.
 async function startCA(page: import('@playwright/test').Page) {
-  await page.evaluate(() => (window as ReiterWindow).__emotoSetCaGrowthRate?.(1))
+  await page.evaluate(() => {
+    ;(window as ReiterWindow).__emotoSetCaGrowthRate?.(1)
+    ;(window as ReiterWindow).__emotoSetCaMaxIterations?.(300)
+  })
 }
 
 test('ReiterCA runs to 100 iterations and produces a stable snowflake', async ({ page }) => {
