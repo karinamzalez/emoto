@@ -19,8 +19,8 @@ export const PROP_EASING: Omit<
   crystallinity: { attackMs: 80, releaseMs: 800 },
   // DRE-36: fast attack for responsiveness, moderate release
   displacement: { attackMs: 60, releaseMs: 300 },
-  // DRE-35: CA props are audio-owned — moderate attack, slower release for stable growth
-  caGrowthRate: { attackMs: 100, releaseMs: 600 },
+  // DRE-39: CA growth mirrors crystallinity timing — same 800ms release for coherent visual pairing
+  caGrowthRate: { attackMs: 80, releaseMs: 800 },
   caMaxIterations: { attackMs: 100, releaseMs: 600 },
 }
 
@@ -103,9 +103,10 @@ const centroidMapping: Mapping = (f: AudioFeatures) => {
   }
 }
 
-// DRE-39: harmonicity → crystallinity (the thesis); also dims iridescence when incoherent
+// DRE-39: harmonicity → crystallinity + CA growth (the thesis); also dims iridescence when incoherent
 const harmonicityMapping: Mapping = (f: AudioFeatures) => ({
   crystallinity: f.harmonicity,
+  caGrowthRate: f.harmonicity,
   iridescence: (0.1 + f.rms * 0.9) * (0.2 + f.harmonicity * 0.8),
 })
 

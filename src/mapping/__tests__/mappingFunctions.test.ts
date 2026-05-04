@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pitchToIor, centroidToThicknessDelta } from '../defaults'
+import { pitchToIor, centroidToThicknessDelta, PROP_EASING } from '../defaults'
 import { AudioMaterialPipeline } from '../pipeline'
 import type { AudioFeatures } from '../../audio/AudioFeaturesSource'
 
@@ -117,5 +117,52 @@ describe('crystallinity (DRE-39)', () => {
     for (let i = 0; i < 5000; i++) pipeline2.tick(noisy, 1)
     const noisyIridescence = pipeline2.tick(noisy, 1).iridescence
     expect(voicedIridescence).toBeGreaterThan(noisyIridescence)
+  })
+})
+
+// ─── DRE-39: harmonicity → caGrowthRate ───────────────────────────────────
+
+describe('caGrowthRate (DRE-39)', () => {
+  it('reaches > 0.8 within 200ms of harmonicity=0.9 input (1ms ticks)', () => {
+    const pipeline = new AudioMaterialPipeline()
+    const features: AudioFeatures = { rms: 0.5, pitchHz: null, centroidHz: 0, harmonicity: 0.9 }
+    let result = pipeline.tick(features, 1)
+    for (let i = 0; i < 199; i++) result = pipeline.tick(features, 1)
+    expect(result.caGrowthRate).toBeGreaterThan(0.8)
+  })
+
+  it('decays below 0.1 within 3 release time constants after harmonicity drops to 0', () => {
+    const pipeline = new AudioMaterialPipeline()
+    const voiced: AudioFeatures = { rms: 0.5, pitchHz: null, centroidHz: 0, harmonicity: 1 }
+    for (let i = 0; i < 5000; i++) pipeline.tick(voiced, 1)
+    // 3 × 800ms release = 2400ms
+    for (let i = 0; i < 2400; i++) pipeline.tick(silent, 1)
+    expect(pipeline.tick(silent, 1).caGrowthRate).toBeLessThan(0.1)
+  })
+
+  it('respects independently tunable release: slower release decays more slowly', () => {
+    const originalAttack = PROP_EASING.caGrowthRate.attackMs
+    const originalRelease = PROP_EASING.caGrowthRate.releaseMs
+    const voiced: AudioFeatures = { rms: 0.5, pitchHz: null, centroidHz: 0, harmonicity: 1 }
+
+    // Fast release pipeline
+    PROP_EASING.caGrowthRate.releaseMs = 100
+    const fastPipeline = new AudioMaterialPipeline()
+    for (let i = 0; i < 5000; i++) fastPipeline.tick(voiced, 1)
+    for (let i = 0; i < 500; i++) fastPipeline.tick(silent, 1)
+    const fastVal = fastPipeline.tick(silent, 1).caGrowthRate
+
+    // Slow release pipeline
+    PROP_EASING.caGrowthRate.releaseMs = 2000
+    const slowPipeline = new AudioMaterialPipeline()
+    for (let i = 0; i < 5000; i++) slowPipeline.tick(voiced, 1)
+    for (let i = 0; i < 500; i++) slowPipeline.tick(silent, 1)
+    const slowVal = slowPipeline.tick(silent, 1).caGrowthRate
+
+    // Restore
+    PROP_EASING.caGrowthRate.attackMs = originalAttack
+    PROP_EASING.caGrowthRate.releaseMs = originalRelease
+
+    expect(slowVal).toBeGreaterThan(fastVal)
   })
 })
