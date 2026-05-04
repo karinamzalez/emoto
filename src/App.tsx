@@ -6,7 +6,7 @@ import { SceneBackground } from './SceneBackground'
 import { Crystal } from './Crystal'
 import { ReiterCA, type ReiterCAHandle } from './gfx/sim/ReiterCA'
 import { LfoPanel } from './animation/LfoPanel'
-import { PROP_EASING } from './mapping/defaults'
+import { CAP_CURVE, PROP_EASING, SCALE_CURVE } from './mapping/defaults'
 
 function getQueryParam(key: string): string {
   return new URLSearchParams(globalThis.location?.search ?? '').get(key) ?? ''
@@ -30,11 +30,19 @@ export function Scene({
 }) {
   const caRef = useRef<ReiterCAHandle>(null)
   const [caGrowthRate, setCaGrowthRate] = useState(0)
+  const [caMaxIterations, setCaMaxIterations] = useState(0)
 
   useEffect(() => {
-    const w = window as Window & { __emotoSetCaGrowthRate?: (v: number) => void }
+    const w = window as Window & {
+      __emotoSetCaGrowthRate?: (v: number) => void
+      __emotoSetCaMaxIterations?: (v: number) => void
+    }
     w.__emotoSetCaGrowthRate = setCaGrowthRate
-    return () => { delete w.__emotoSetCaGrowthRate }
+    w.__emotoSetCaMaxIterations = setCaMaxIterations
+    return () => {
+      delete w.__emotoSetCaGrowthRate
+      delete w.__emotoSetCaMaxIterations
+    }
   }, [])
 
   // DRE-39: Leva controls for live tuning of harmonicity easing — mutates PROP_EASING directly
@@ -52,12 +60,25 @@ export function Scene({
     PROP_EASING.caGrowthRate.releaseMs = caReleaseMs
   }, [crystAttackMs, crystReleaseMs, caAttackMs, caReleaseMs])
 
+  // DRE-40: Leva controls for sustained-duration curves — mutates CAP_CURVE / SCALE_CURVE directly
+  const { capMidpoint, capSteepness, scaleTau } = useControls('Sustained Duration', {
+    capMidpoint: { value: 5, min: 1, max: 15, step: 0.5, label: 'Cap curve midpoint (s)' },
+    capSteepness: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Cap curve steepness' },
+    scaleTau: { value: 2.5, min: 0.5, max: 10, step: 0.5, label: 'Scale time constant (s)' },
+  })
+
+  useEffect(() => {
+    CAP_CURVE.midpoint = capMidpoint
+    CAP_CURVE.steepness = capSteepness
+    SCALE_CURVE.tau = scaleTau
+  }, [capMidpoint, capSteepness, scaleTau])
+
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 0, 5]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      <ReiterCA ref={caRef} growthRate={caGrowthRate} maxIterations={200} seed={42} debug={isDebug} />
+      <ReiterCA ref={caRef} growthRate={caGrowthRate} maxIterations={Math.round(caMaxIterations)} seed={42} debug={isDebug} />
       <Crystal
         crystallinity={showDroplet ? undefined : 1}
         getDensityTexture={() => caRef.current?.densityTexture ?? null}

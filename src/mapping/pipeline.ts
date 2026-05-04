@@ -2,6 +2,8 @@ import type { AudioFeatures } from '../audio/AudioFeaturesSource'
 import type { DropletAudioProps, Mapping } from './types'
 import { onePole } from './easing'
 import {
+  CAP_ATTACK_MS,
+  CAP_RELEASE_MS,
   DEFAULT_MAPPINGS,
   HARMONY_THRESHOLD,
   INITIAL_PROPS,
@@ -9,6 +11,7 @@ import {
   PROP_EASING,
   SCALE_ATTACK_MS,
   SCALE_RELEASE_MS,
+  capFromDuration,
   scaleFromDuration,
 } from './defaults'
 
@@ -52,19 +55,29 @@ export class AudioMaterialPipeline {
       }
     }
 
-    // DRE-40: scale growth — bespoke, driven by sustained coherent input duration
+    // DRE-40: scale + caMaxIterations — driven by sustained coherent input duration
     const coherent = features.harmonicity > HARMONY_THRESHOLD && features.rms > NOISE_FLOOR
     if (coherent) {
       this.sustainedDuration += dtMs / 1000
     } else {
       this.sustainedDuration = 0
     }
+
     const targetScale = coherent ? scaleFromDuration(this.sustainedDuration) : 1.0
     this.smoothed.scale = onePole(
       this.smoothed.scale,
       targetScale,
       SCALE_ATTACK_MS,
       SCALE_RELEASE_MS,
+      dtMs
+    )
+
+    const targetCap = coherent ? capFromDuration(this.sustainedDuration) : 0
+    this.smoothed.caMaxIterations = onePole(
+      this.smoothed.caMaxIterations,
+      targetCap,
+      CAP_ATTACK_MS,
+      CAP_RELEASE_MS,
       dtMs
     )
 
