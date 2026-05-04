@@ -19,6 +19,9 @@ export const PROP_EASING: Omit<
   crystallinity: { attackMs: 80, releaseMs: 800 },
   // DRE-36: fast attack for responsiveness, moderate release
   displacement: { attackMs: 60, releaseMs: 300 },
+  // DRE-35: CA props are audio-owned — moderate attack, slower release for stable growth
+  caGrowthRate: { attackMs: 100, releaseMs: 600 },
+  caMaxIterations: { attackMs: 100, releaseMs: 600 },
 }
 
 export const INITIAL_PROPS: DropletAudioProps = {
@@ -32,6 +35,8 @@ export const INITIAL_PROPS: DropletAudioProps = {
   crystallinity: 0,
   displacement: 0,
   scale: 1.0,
+  caGrowthRate: 0,
+  caMaxIterations: 0,
 }
 
 // DRE-40: coherence threshold and scale growth constants

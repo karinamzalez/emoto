@@ -11,6 +11,8 @@ export interface DropletAudioProps {
   crystallinity: number
   displacement: number
   scale: number
+  caGrowthRate: number // 0..1 — drives Reiter CA step size (DRE-109)
+  caMaxIterations: number // integer cap — max CA steps per frame (DRE-109)
 }
 
 export type Mapping = (features: AudioFeatures) => Partial<DropletAudioProps>
