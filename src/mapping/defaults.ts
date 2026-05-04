@@ -2,11 +2,11 @@ import type { AudioFeatures } from '../audio/AudioFeaturesSource'
 import type { DropletAudioProps, Mapping } from './types'
 import type { Oscillator } from '../animation/Oscillators'
 
-// `scale` is driven by sustainedDuration in the pipeline (not via generic easing), so it is
-// intentionally absent from PROP_EASING.
+// `scale` and `caMaxIterations` are driven by sustainedDuration in the pipeline (not via generic
+// easing), so they are intentionally absent from PROP_EASING.
 export const PROP_EASING: Omit<
   Record<keyof DropletAudioProps, { attackMs: number; releaseMs: number }>,
-  'scale'
+  'scale' | 'caMaxIterations'
 > = {
   ior: { attackMs: 50, releaseMs: 400 },
   iridescence: { attackMs: 80, releaseMs: 600 },
@@ -21,7 +21,6 @@ export const PROP_EASING: Omit<
   displacement: { attackMs: 60, releaseMs: 300 },
   // DRE-39: CA growth mirrors crystallinity timing — same 800ms release for coherent visual pairing
   caGrowthRate: { attackMs: 80, releaseMs: 800 },
-  caMaxIterations: { attackMs: 100, releaseMs: 600 },
 }
 
 export const INITIAL_PROPS: DropletAudioProps = {
@@ -39,16 +38,29 @@ export const INITIAL_PROPS: DropletAudioProps = {
   caMaxIterations: 0,
 }
 
-// DRE-40: coherence threshold and scale growth constants
+// DRE-40: coherence threshold and sustained-duration curve constants
 export const HARMONY_THRESHOLD = 0.6
 export const NOISE_FLOOR = 0.02
 export const SCALE_ATTACK_MS = 200
 export const SCALE_RELEASE_MS = 1500
+export const CAP_ATTACK_MS = 100
+export const CAP_RELEASE_MS = 3000
+
+// Mutable singletons for Leva live-tuning (same pattern as PROP_EASING)
+export const SCALE_CURVE = { tau: 2.5 }
+export const CAP_CURVE = { midpoint: 5, steepness: 3 }
 
 // Exponential approach to 1.3× — grows quickly past 3s, plateaus naturally.
 // scaleFromDuration(4) ≈ 1.24 (satisfies >1.2 within 4s test).
 export function scaleFromDuration(durationSec: number): number {
-  return 1.0 + 0.3 * (1 - Math.exp(-durationSec / 2.5))
+  return 1.0 + 0.3 * (1 - Math.exp(-durationSec / SCALE_CURVE.tau))
+}
+
+// Logistic curve: 50 + 250 * sigmoid((s − midpoint) / steepness), clamped to [50, 300].
+// capFromDuration(5) ≈ 175 (midpoint of the range).
+export function capFromDuration(durationSec: number): number {
+  const sigmoid = 1 / (1 + Math.exp(-((durationSec - CAP_CURVE.midpoint) / CAP_CURVE.steepness)))
+  return Math.min(300, Math.max(50, 50 + 250 * sigmoid))
 }
 
 const LOG_PITCH_LOW = Math.log(80)

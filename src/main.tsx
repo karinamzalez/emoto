@@ -34,6 +34,7 @@ const w = window as Window & {
   __emotoSetDisplacement?: (value: number) => void
   __emotoSetScale?: (value: number) => void
   __emotoSetCaGrowthRate?: (value: number) => void
+  __emotoSetCaMaxIterations?: (value: number) => void
   __emotoSetRotationOffset?: (x: number, y: number) => void
   __emotoSetLfoTime?: (t: number | null) => void
   __emotoSetLfoEnabled?: (target: string, enabled: boolean) => void
@@ -112,6 +113,7 @@ mic.onReady(({ analyser, sampleRate }) => {
       })
       w.__emotoSetCrystallinity?.(props.crystallinity)
       w.__emotoSetCaGrowthRate?.(props.caGrowthRate)
+      w.__emotoSetCaMaxIterations?.(props.caMaxIterations)
       w.__emotoSetDisplacement?.(props.displacement)
       w.__emotoSetScale?.(props.scale)
     }
