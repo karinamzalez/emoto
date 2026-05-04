@@ -11,12 +11,19 @@ async function waitForCanvas(page: import('@playwright/test').Page) {
 type ReiterWindow = Window & {
   __emotoReiterIter?: number
   __emotoReiterDensityAt?: (col: number, row: number) => number
+  __emotoSetCaGrowthRate?: (v: number) => void
+}
+
+// CA starts frozen (audio-driven); force growthRate=1 so tests don't need a mic.
+async function startCA(page: import('@playwright/test').Page) {
+  await page.evaluate(() => (window as ReiterWindow).__emotoSetCaGrowthRate?.(1))
 }
 
 test('ReiterCA runs to 100 iterations and produces a stable snowflake', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/?debug=1')
   await waitForCanvas(page)
+  await startCA(page)
 
   // Wait for simulation to reach 100 iterations (growthRate=1 → ~3.3s)
   await page.waitForFunction(
@@ -51,6 +58,7 @@ test('ReiterCA density texture has hex 6-fold symmetry after 100 iterations', as
   await page.setViewportSize({ width: 800, height: 800 })
   await page.goto('/?debug=1')
   await waitForCanvas(page)
+  await startCA(page)
 
   await page.waitForFunction(
     () => ((window as ReiterWindow).__emotoReiterIter ?? 0) >= 100,

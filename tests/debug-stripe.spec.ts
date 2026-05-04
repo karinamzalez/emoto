@@ -8,6 +8,10 @@ test('debug stripe pixels no pmrem', async ({ page }) => {
     return !!el && el.width > 0 && el.height > 0
   })
   await page.waitForTimeout(400)
+  // CA starts frozen (audio-driven); force growthRate=1 so tests don't need a mic.
+  await page.evaluate(() => {
+    ;(window as { __emotoSetCaGrowthRate?: (v: number) => void }).__emotoSetCaGrowthRate?.(1)
+  })
   await page.waitForFunction(
     (n: number) => ((window as { __emotoReiterIter?: number }).__emotoReiterIter ?? 0) >= n,
     50,
