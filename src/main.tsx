@@ -95,28 +95,26 @@ mic.onReady(({ analyser, sampleRate }) => {
     const features = source.read(dtMs)
     debugOverlay?.update(features)
 
-    if (!isDebugMode) {
-      const lfo = cachedLfoFrame
-      const props = pipeline.tick(features, dtMs, {
-        thickness: lfo.thickness,
-        iridescenceIOR: lfo.iridescenceIOR,
-      })
+    const lfo = cachedLfoFrame
+    const props = pipeline.tick(features, dtMs, {
+      thickness: lfo.thickness,
+      iridescenceIOR: lfo.iridescenceIOR,
+    })
 
-      w.__emotoSetMaterial?.({
-        ior: props.ior,
-        iridescence: props.iridescence,
-        iridescenceIOR: props.iridescenceIOR,
-        iridescenceThicknessRange: [props.iridescenceThicknessMin, props.iridescenceThicknessMax] as [number, number],
-        thickness: props.thickness,
-        dispersion: props.chromaticAberration * 10,
-        roughness: BASE_ROUGHNESS + lfo.roughness,
-      })
-      w.__emotoSetCrystallinity?.(props.crystallinity)
-      w.__emotoSetCaGrowthRate?.(props.caGrowthRate)
-      w.__emotoSetCaMaxIterations?.(props.caMaxIterations)
-      w.__emotoSetDisplacement?.(props.displacement)
-      w.__emotoSetScale?.(props.scale)
-    }
+    w.__emotoSetMaterial?.({
+      ior: props.ior,
+      iridescence: props.iridescence,
+      iridescenceIOR: props.iridescenceIOR,
+      iridescenceThicknessRange: [props.iridescenceThicknessMin, props.iridescenceThicknessMax] as [number, number],
+      thickness: props.thickness,
+      dispersion: props.chromaticAberration * 10,
+      roughness: BASE_ROUGHNESS + lfo.roughness,
+    })
+    w.__emotoSetCrystallinity?.(props.crystallinity)
+    w.__emotoSetCaGrowthRate?.(props.caGrowthRate)
+    w.__emotoSetCaMaxIterations?.(props.caMaxIterations)
+    w.__emotoSetDisplacement?.(props.displacement)
+    w.__emotoSetScale?.(props.scale)
 
     requestAnimationFrame(tick)
   }
