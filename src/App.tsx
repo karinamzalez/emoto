@@ -290,7 +290,7 @@ export function App() {
 
   return (
     <>
-      <Leva hidden />
+      <Leva />
       <LfoPanel />
       <Canvas
         id="r3f-canvas"
@@ -305,7 +305,7 @@ export function App() {
         style={{
           position: 'fixed',
           top: '1.25rem',
-          right: '1.25rem',
+          left: '1.25rem',
           zIndex: 50,
           background: 'rgba(255,255,255,0.08)',
           border: '1px solid rgba(255,255,255,0.55)',
