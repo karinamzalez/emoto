@@ -304,21 +304,34 @@ export function App() {
         title="Piece inspiration"
         style={{
           position: 'fixed',
-          bottom: '1.25rem',
-          right: '1.25rem',
+          top: '1.25rem',
+          left: '1.25rem',
           zIndex: 50,
-          background: 'transparent',
-          border: '1px solid rgba(255,255,255,0.35)',
-          color: 'rgba(255,255,255,0.65)',
+          background: 'rgba(255,255,255,0.08)',
+          border: '1.5px solid rgba(255,255,255,0.7)',
+          color: '#fff',
           fontFamily: 'system-ui, sans-serif',
-          fontSize: '0.75rem',
-          letterSpacing: '0.04em',
-          padding: '0.45rem 0.9rem',
+          fontSize: '0.85rem',
+          fontWeight: 500,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          padding: '0.6rem 1.2rem',
           borderRadius: 4,
           cursor: 'pointer',
+          backdropFilter: 'blur(6px)',
+          boxShadow: '0 0 12px rgba(255,255,255,0.1)',
+          transition: 'background 0.2s, box-shadow 0.2s',
         }}
-        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)' }}
-        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'transparent' }}
+        onMouseEnter={e => {
+          const b = e.target as HTMLButtonElement
+          b.style.background = 'rgba(255,255,255,0.18)'
+          b.style.boxShadow = '0 0 20px rgba(255,255,255,0.2)'
+        }}
+        onMouseLeave={e => {
+          const b = e.target as HTMLButtonElement
+          b.style.background = 'rgba(255,255,255,0.08)'
+          b.style.boxShadow = '0 0 12px rgba(255,255,255,0.1)'
+        }}
       >
         about
       </button>
