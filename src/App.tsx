@@ -290,7 +290,7 @@ export function App() {
 
   return (
     <>
-      <Leva />
+      <Leva hidden />
       <LfoPanel />
       <Canvas
         id="r3f-canvas"
@@ -304,21 +304,33 @@ export function App() {
         title="Piece inspiration"
         style={{
           position: 'fixed',
-          bottom: '1.25rem',
+          top: '1.25rem',
           right: '1.25rem',
           zIndex: 50,
-          background: 'transparent',
-          border: '1px solid rgba(255,255,255,0.35)',
-          color: 'rgba(255,255,255,0.65)',
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.55)',
+          color: 'rgba(255,255,255,0.9)',
           fontFamily: 'system-ui, sans-serif',
-          fontSize: '0.75rem',
-          letterSpacing: '0.04em',
-          padding: '0.45rem 0.9rem',
-          borderRadius: 4,
+          fontSize: '0.8rem',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          padding: '0.5rem 1.1rem',
+          borderRadius: 20,
           cursor: 'pointer',
+          backdropFilter: 'blur(6px)',
+          boxShadow: '0 0 12px rgba(255,255,255,0.12)',
+          transition: 'background 0.2s, box-shadow 0.2s',
         }}
-        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)' }}
-        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'transparent' }}
+        onMouseEnter={e => {
+          const btn = e.target as HTMLButtonElement
+          btn.style.background = 'rgba(255,255,255,0.18)'
+          btn.style.boxShadow = '0 0 20px rgba(255,255,255,0.25)'
+        }}
+        onMouseLeave={e => {
+          const btn = e.target as HTMLButtonElement
+          btn.style.background = 'rgba(255,255,255,0.08)'
+          btn.style.boxShadow = '0 0 12px rgba(255,255,255,0.12)'
+        }}
       >
         about
       </button>
