@@ -41,6 +41,7 @@ export function SceneBackground({ url }: Props) {
     let envmap: THREE.Texture | null = null
     let bgTex: THREE.Texture | null = null
     let isCancelled = false
+    let resizeCleanup: (() => void) | null = null
     const cancelled = () => isCancelled
 
     if (!url) {
@@ -56,21 +57,28 @@ export function SceneBackground({ url }: Props) {
         const img = tex.image as HTMLImageElement | ImageBitmap
         const iw = 'naturalWidth' in img ? img.naturalWidth : img.width
         const ih = 'naturalHeight' in img ? img.naturalHeight : img.height
-        const w = gl.domElement.clientWidth || gl.domElement.width
-        const h = gl.domElement.clientHeight || gl.domElement.height
 
-        // Tile at native pixel scale via UV repeat. Mutating tex.image would replace
-        // the HTMLImageElement with an ImageBitmap of a different size, which conflicts
-        // with Three.js's immutable texStorage2D allocation and silently breaks crystal
-        // transmission. Using wrapS/wrapT + repeat keeps the original image intact.
-        // colorSpace must be set explicitly — TextureLoader leaves it as NoColorSpace,
-        // which makes WebGLBackground set toneMapped=true on the planeMesh and apply
-        // ACESFilmic tone mapping to the background, washing out all values to ~226.
+        // Cover + center: scale image to fill the canvas (like CSS background-size:cover),
+        // then center via offset. colorSpace must be set explicitly — TextureLoader leaves
+        // it as NoColorSpace, which causes ACESFilmic tone mapping on the background plane,
+        // washing out all values to ~226.
         tex.colorSpace = THREE.SRGBColorSpace
         tex.wrapS = THREE.RepeatWrapping
         tex.wrapT = THREE.RepeatWrapping
-        tex.repeat.set(w / iw, h / ih)
-        tex.needsUpdate = true
+
+        const updateRepeat = () => {
+          const cw = gl.domElement.clientWidth || gl.domElement.width
+          const ch = gl.domElement.clientHeight || gl.domElement.height
+          const scale = Math.max(cw / iw, ch / ih)
+          const rx = cw / (iw * scale)
+          const ry = ch / (ih * scale)
+          tex.repeat.set(rx, ry)
+          tex.offset.set((1 - rx) / 2, (1 - ry) / 2)
+          tex.needsUpdate = true
+        }
+        updateRepeat()
+        window.addEventListener('resize', updateRepeat)
+        resizeCleanup = () => window.removeEventListener('resize', updateRepeat)
 
         bgTex = tex
         scene.background = tex
@@ -96,6 +104,7 @@ export function SceneBackground({ url }: Props) {
 
     return () => {
       isCancelled = true
+      resizeCleanup?.()
       scene.background = null
       scene.environment = null
       bgTex?.dispose()
