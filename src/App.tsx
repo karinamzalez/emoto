@@ -18,7 +18,7 @@ As an indigenous mexican-american, being a software engineer has always felt lik
 
 On the weekends, I'm praying with my community. Bare feet in the earth, hair embraced by the wind, the aroma of copal and cedar grounding my heart in the knowing that Creator God and my ancestors are near. My joy in these moments is boundless, I feel it radiating from me, akin to the warmth of the sun pignmenting my skin.
 
-Whether I'm in temazcal/inipi (sweatlodge), ceremony, or danza — one thing remains constant. The palpable sacredness of water.
+Whether I'm in temazcal/inipi (sweatlodge), ceremony, or danza — one thing remains constant: the palpable sacredness of water.
 
 We pass a single pail of prayerfully-harvested spring water, sing medicine songs over it, pass it, and drink it with reverence.
 
@@ -70,7 +70,7 @@ I'd rather tell you this than let you walk away feeling guilty about asking me q
 
 ———————————————-
 
-In 2020, before AI was as pervasive as it is today, I had a lucid dream where I encountered the spirit of AI.
+In 2020, before AI was as pervasive as it is today, I had a lucid dream where I encountered the "spirit of AI".
 
 In this dream, I was sitting on my mothers front porch. Birds chirping, the soothing rustling of leaves whispering in the wind... air-- moist. Suddenly, a being appeared before me. They seemed human in form, but I had a knowing that they were not. When they spoke, their words were distorted by visible electrical currents. They said "I am the spirit of AI, would you like to see the world through my eyes?".
 
