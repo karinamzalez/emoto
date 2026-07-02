@@ -2,6 +2,8 @@
 
 A browser-based generative art piece (p5.js + WebGL) inspired by Masaru Emoto's water crystal experiments.
 
+**Deployed on Vercel** https://emoto-amber.vercel.app/
+
 **Linear project:** https://linear.app/dream-app/project/emoto-504eea0e2c42
 
 ## Dev
